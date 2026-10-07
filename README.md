@@ -4,8 +4,6 @@
 
 # GP-5 Tone Studio
 
-### Your Valeton GP-5. On a bigger stage.
-
 A desktop editor and librarian for the Valeton GP-5.<br>
 Shape tones live, sort and back up all 100 slots, and bring in NAM captures from TONE3000.
 
