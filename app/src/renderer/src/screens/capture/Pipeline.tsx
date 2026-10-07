@@ -1,0 +1,351 @@
+import { useEffect, useState, type ReactNode } from "react";
+import { ArrowRight, Check, ExternalLink, FolderOpen, RotateCcw, Save, Send, TriangleAlert } from "lucide-react";
+import type { T3kModel } from "@shared/host/tones";
+import { prepareNam } from "@shared/nam";
+import { isGp5Model, proposeSlotName, sanitizeSlotName } from "@shared/tone3000";
+import { Button } from "@/components/ui/button";
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
+import { Spinner } from "@/components/ui/spinner";
+import { Capture } from "@/components/gear";
+import { host, isElectron } from "@/host";
+import { notifyError, notifySuccess } from "@/app/notify";
+import { cn } from "@/lib/utils";
+import { useNav } from "@/state/nav";
+import { openSheet, startSendDraft, useTones } from "@/screens/tones/store";
+import { isFlat } from "./nam/shaping";
+import { exportText, useCapture } from "./store";
+import { Led, PANEL, useCaptureTitle, useToneRecord } from "./parts";
+import { verdictOf } from "./Head";
+
+type StepStatus = "done" | "current" | "pending" | "fault";
+
+function Step({ n, status, title, children }: { n: number; status: StepStatus; title: ReactNode; children?: ReactNode }) {
+  return (
+    <li className="relative flex gap-3 pb-2.5 last:pb-0 [&:not(:last-child)]:before:absolute [&:not(:last-child)]:before:top-6 [&:not(:last-child)]:before:bottom-0.5 [&:not(:last-child)]:before:left-2.5 [&:not(:last-child)]:before:w-px [&:not(:last-child)]:before:bg-seam-strong">
+      <span
+        aria-hidden
+        className={cn(
+          "grid size-[21px] flex-none place-items-center rounded-full text-[11px] font-bold",
+          status === "done" && "bg-muted text-led-on",
+          status === "current" && "text-silkscreen shadow-[inset_0_0_0_1.5px_var(--silkscreen)]",
+          status === "pending" && "text-silkscreen-3 shadow-[inset_0_0_0_1px_var(--seam-strong)]",
+          status === "fault" && "bg-led-fault/15 text-led-fault",
+        )}
+      >
+        {status === "done" ? <Check className="size-3" strokeWidth={2.5} /> : status === "fault" ? <TriangleAlert className="size-3" /> : n}
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-px text-[12px]">
+        <b className={cn("font-semibold", status === "pending" ? "text-silkscreen-2" : "text-silkscreen")}>
+          <span className="sr-only">{`Step ${n}, ${status === "fault" ? "can't run" : status}: `}</span>
+          {title}
+        </b>
+        {children}
+      </div>
+    </li>
+  );
+}
+
+const Sub = ({ children }: { children: ReactNode }) => <span className="text-pretty text-silkscreen-3">{children}</span>;
+
+function Stop({ name, title, sub, lit, caption, image }: { name: string; title: string; sub: string; lit: boolean; caption?: string; image?: string }) {
+  return (
+    <div className="flex min-w-0 flex-col items-center gap-1 text-center">
+      <Capture name={name} on={lit} caption={caption} image={image} className={cn("w-[34px]", !lit && "brightness-70 saturate-40")} />
+      <b className="text-[11px] font-semibold text-silkscreen">{title}</b>
+      <span className="text-[11px] leading-tight text-balance text-silkscreen-3">{sub}</span>
+    </div>
+  );
+}
+
+function Hop({ top, bottom }: { top: string; bottom: string }) {
+  return (
+    <div className="flex flex-col items-center gap-0.5 pt-3 text-[11px] whitespace-nowrap text-silkscreen-3">
+      <ArrowRight className="size-3.5" aria-hidden />
+      {top}
+      <b className="font-semibold text-silkscreen-2">{bottom}</b>
+    </div>
+  );
+}
+
+/** TONE3000 A1 standard model of this tone, if any (step 1). */
+function useLegacyA1(toneId: number | null) {
+  const [state, setState] = useState<{ status: "idle" | "loading" | "done" | "error"; model: T3kModel | null; error: string | null }>({ status: "idle", model: null, error: null });
+  const [nonce, setNonce] = useState(0);
+  useEffect(() => {
+    if (toneId === null) return;
+    let live = true;
+    setState({ status: "loading", model: null, error: null });
+    host.tones.models(toneId).then(
+      (models) => live && setState({ status: "done", model: models.find(isGp5Model) ?? null, error: null }),
+      (e: Error) => live && setState({ status: "error", model: null, error: e?.message ?? String(e) }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [toneId, nonce]);
+  return { ...state, retry: () => setNonce((n) => n + 1) };
+}
+
+export function Pipeline() {
+  const loaded = useCapture((s) => s.loaded)!;
+  const recipe = useCapture((s) => s.recipe)!;
+  const base = useCapture((s) => s.base);
+  const record = useToneRecord();
+  const title = useCaptureTitle();
+  const image = useTones((s) => (record?.image_url ? (s.images[record.image_url] ?? undefined) : undefined));
+  const { info } = loaded;
+  const verdict = verdictOf(info, record?.gp5.snaptoneSlot ?? null);
+  const blocked = info.unsupported !== null || (info.arch.kind === "A1" && info.arch.size !== "standard");
+  const versionLabel = base === 0 ? "Original" : `Version ${base}`;
+
+  return (
+    <section
+      aria-label="Make it GP-5 ready"
+      className={cn(
+        PANEL,
+        "relative col-start-2 row-span-2 row-start-1 flex flex-col overflow-hidden shadow-[var(--glass-shine),0_0_0_1px_rgb(255_255_255/0.2)] min-[1421px]:col-start-3",
+        "before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-block-ns",
+      )}
+    >
+      <div className="px-5 pt-4 pb-2">
+        <p className="m-0 mb-1 text-[12px] text-silkscreen-2">GP-5 version · user SnapTone</p>
+        <h2 className="m-0 mb-1.5 text-[24px] leading-[1.1] font-bold tracking-[-0.01em]">Make it GP-5 ready</h2>
+        <p className="m-0 text-[12px] text-pretty text-silkscreen-3">
+          {info.arch.kind === "A1" && !blocked
+            ? "The GP-5 loads NAM A1 standard only, and this capture is one. Valeton Suite turns it into a SnapTone."
+            : "The GP-5 loads NAM A1 standard only. An A2 capture needs an A1 learned from it first."}
+        </p>
+      </div>
+
+      {blocked ? (
+        <div className="mx-5 mt-2 flex gap-2.5 rounded-lg bg-well p-3 text-[12px]">
+          <Led tone="fault" className="mt-1" />
+          <div className="flex flex-col gap-0.5">
+            <b className="font-semibold text-silkscreen">{verdict.label}</b>
+            <span className="text-pretty text-silkscreen-2">{verdict.reason}</span>
+          </div>
+        </div>
+      ) : info.arch.kind === "A2" ? (
+        <A2Pipeline title={title} image={image} versionLabel={versionLabel} shaped={!isFlat(recipe.shaping)} />
+      ) : (
+        <A1Pipeline title={title} image={image} shaped={!isFlat(recipe.shaping)} exportFile={() => exportText(loaded, recipe)} />
+      )}
+    </section>
+  );
+}
+
+function A2Pipeline({ title, image, versionLabel, shaped }: { title: string; image?: string; versionLabel: string; shaped: boolean }) {
+  const loaded = useCapture((s) => s.loaded)!;
+  const record = useToneRecord();
+  const toneId = loaded.source.kind === "tone" ? Number(loaded.source.ref) : null;
+  const legacy = useLegacyA1(toneId);
+  const go = useNav((s) => s.go);
+
+  const sendLegacy = () => {
+    if (toneId === null || !legacy.model) return;
+    startSendDraft(toneId, legacy.model.id, proposeSlotName(record?.title ?? title, legacy.model.name), "snaptone");
+    openSheet(toneId);
+    go("tones", String(toneId));
+  };
+
+  let step1: ReactNode;
+  let step1Status: StepStatus = "done";
+  if (toneId === null) {
+    step1 = <Step n={1} status="done" title="Not a TONE3000 tone"><Sub>This file was opened from disk, so there's no A1 model to look up.</Sub></Step>;
+  } else if (legacy.status === "loading" || legacy.status === "idle") {
+    step1Status = "current";
+    step1 = (
+      <Step n={1} status="current" title="Looking for an A1 model on TONE3000">
+        <span className="flex items-center gap-2 text-silkscreen-3">
+          <Spinner className="size-3" />
+          Checking this tone's models
+        </span>
+      </Step>
+    );
+  } else if (legacy.status === "error") {
+    step1Status = "fault";
+    step1 = (
+      <Step n={1} status="fault" title="Couldn't check TONE3000">
+        <Sub>{legacy.error}</Sub>
+        <Button variant="ghost" size="sm" className="mt-1 self-start" onClick={legacy.retry}>
+          <RotateCcw className="size-3.5" aria-hidden />
+          Retry
+        </Button>
+      </Step>
+    );
+  } else if (legacy.model) {
+    step1Status = "current";
+    step1 = (
+      <Step n={1} status="current" title="TONE3000 has an A1 model of this tone">
+        <Sub>
+          {shaped
+            ? "TONE3000's A1 doesn't include your shaping. It can still go to the GP-5 as it was captured."
+            : `“${legacy.model.name}” is A1 standard, so it can go to the GP-5 without training.`}
+        </Sub>
+        <Button variant="default" size="sm" className="mt-2 self-start" onClick={sendLegacy}>
+          <Send className="size-3.5" aria-hidden />
+          Send it to the GP-5
+        </Button>
+      </Step>
+    );
+  } else {
+    step1 = <Step n={1} status="done" title="No A1 model on TONE3000"><Sub>This tone is A2 only.</Sub></Step>;
+  }
+
+  return (
+    <>
+      <div className="mx-5 grid grid-cols-[1fr_auto_1fr_auto_1fr] items-start gap-1 rounded-lg bg-well px-1.5 py-2.5" aria-label="Chain of approximations">
+        <Stop name={title} title="A2-Full" sub={versionLabel} lit caption="NAM A2" image={image} />
+        <Hop top="distilled" bottom="not run" />
+        <Stop name="A1" title="A1 standard" sub="Not made" lit={false} caption="NAM A1" />
+        <Hop top="Valeton" bottom="converts" />
+        <Stop name="SnapTone" title="SnapTone" sub="Can't be measured here" lit={false} />
+      </div>
+      <ol className="m-0 min-h-0 flex-1 list-none overflow-auto px-5 pt-3 pb-3">
+        {step1}
+        <Step n={2} status={step1Status === "current" && legacy.model ? "pending" : "fault"} title="Learn the A1 from your A2">
+          <Sub>
+            Learning an A1 needs the capture trainer (Python, PyTorch and the NAM trainer, run on this computer). This version of Tone Studio doesn't include it,
+            so this step can't run here.
+          </Sub>
+        </Step>
+        <Step n={3} status="pending" title="Check how close it is">
+          <Sub>ESR and null test against the A2 on clips it hasn't heard.</Sub>
+        </Step>
+        <Step n={4} status="pending" title="Save for Valeton Suite">
+          <Sub>NAM 0.5.x file, checked before it's saved.</Sub>
+        </Step>
+        <Step n={5} status="pending" title="Import in Suite, then link the slot">
+          <Sub>When Suite closes, Tone Studio finds the new SnapTone and links it to this tone.</Sub>
+        </Step>
+      </ol>
+    </>
+  );
+}
+
+function A1Pipeline({ title, image, shaped, exportFile }: { title: string; image?: string; shaped: boolean; exportFile: () => string }) {
+  const loaded = useCapture((s) => s.loaded)!;
+  const record = useToneRecord();
+  const go = useNav((s) => s.go);
+  const toneId = loaded.source.kind === "tone" ? Number(loaded.source.ref) : null;
+  const [name, setName] = useState(() => proposeSlotName(title));
+  const [saved, setSaved] = useState<{ path: string; fileName: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const linked = record?.gp5.snaptoneSlot ?? null;
+
+  const sendViaTones = () => {
+    if (toneId === null || loaded.key.modelId === null) return;
+    startSendDraft(toneId, loaded.key.modelId, proposeSlotName(record?.title ?? title), "snaptone", { text: exportFile() });
+    openSheet(toneId);
+    go("tones", String(toneId));
+  };
+
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const { json } = prepareNam(exportFile());
+      const fileName = `${sanitizeSlotName(name) || "CAPTURE"}.nam`;
+      const path = await host.capture.saveForSuite(fileName, json);
+      setSaved({ path, fileName });
+      notifySuccess(`Saved ${fileName}`, "NAM 0.5.x, checked. Import it in Valeton Suite.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openSuite = async () => {
+    try {
+      const settings = await host.app.getSettings();
+      if (!settings.valetonSuitePath) {
+        const path = await host.tones.pickSuite();
+        if (!path) return;
+        await host.app.setSettings({ valetonSuitePath: path });
+      }
+      await host.tones.openSuite();
+    } catch (e) {
+      notifyError("Couldn't open Valeton Suite", e);
+    }
+  };
+
+  const linux = host.platform === "linux";
+  return (
+    <>
+      <div className="mx-5 grid grid-cols-[1fr_auto_1fr] items-start gap-1 rounded-lg bg-well px-1.5 py-2.5" aria-label="Chain of approximations">
+        <Stop name={title} title="A1 standard" sub="This capture" lit caption="NAM A1" image={image} />
+        <Hop top="Valeton" bottom="converts" />
+        <Stop name={linked !== null ? `Slot ${linked}` : "SnapTone"} title="SnapTone" sub={linked !== null ? `Slot ${linked}` : "Can't be measured here"} lit={linked !== null} />
+      </div>
+      <ol className="m-0 min-h-0 flex-1 list-none overflow-auto px-5 pt-3 pb-3">
+        <Step n={1} status="done" title="Already A1 standard">
+          <Sub>{shaped ? "Your shaping isn't in the file sent to the GP-5: baking it in needs the capture trainer, which this version doesn't include." : "No conversion needed. Your level and info edits go with it."}</Sub>
+        </Step>
+        {toneId !== null ? (
+          <Step n={2} status={linked !== null ? "done" : "current"} title={linked !== null ? `Linked to slot ${linked} on your GP-5` : "Send to the GP-5"}>
+            <Sub>Tone Studio saves your version for Valeton Suite, you import it there, and the new SnapTone links back to this tone.</Sub>
+            <Button variant={linked !== null ? "outline" : "default"} size="sm" className="mt-2 self-start" onClick={sendViaTones}>
+              <Send className="size-3.5" aria-hidden />
+              {linked !== null ? "Send again" : "Send to GP-5…"}
+            </Button>
+          </Step>
+        ) : (
+          <>
+            <Step n={2} status={saved ? "done" : "current"} title={saved ? `Saved ${saved.fileName}` : "Save for Valeton Suite"}>
+              <Sub>NAM 0.5.x file, checked before it's saved. GP-5 names hold 10 characters.</Sub>
+              {!saved && (
+                <div className="mt-2 flex items-center gap-2">
+                  <InputGroup className="min-w-0 flex-1">
+                    <InputGroupInput
+                      aria-label="Name on the GP-5"
+                      value={name}
+                      maxLength={10}
+                      onChange={(e) => setName(sanitizeSlotName(e.target.value.toUpperCase()))}
+                      className="font-semibold tracking-[0.04em]"
+                    />
+                    <InputGroupAddon align="inline-end">
+                      <InputGroupText className="tabular-nums">{name.length}/10</InputGroupText>
+                    </InputGroupAddon>
+                  </InputGroup>
+                  <Button variant="default" size="sm" disabled={!isElectron || busy || !name} onClick={save}>
+                    {busy ? <Spinner className="size-3.5" /> : <Save className="size-3.5" aria-hidden />}
+                    Save
+                  </Button>
+                </div>
+              )}
+              {!isElectron && <Sub>Saving for Valeton Suite needs the desktop app.</Sub>}
+              {error && (
+                <span className="text-led-fault" role="alert">
+                  {error}
+                </span>
+              )}
+            </Step>
+            <Step n={3} status={saved ? "current" : "pending"} title="Import in Valeton Suite">
+              {linux ? (
+                <Sub>Valeton Suite runs on Windows and macOS. Copy {saved?.fileName ?? "the file"} to a computer with Suite and import it into a user SnapTone slot.</Sub>
+              ) : (
+                <Sub>Import {saved?.fileName ?? "the file"} into a free user SnapTone slot (50–79). Files opened from disk aren't TONE3000 tones, so there's nothing to link back.</Sub>
+              )}
+              {saved && (
+                <span className="mt-2 flex items-center gap-2">
+                  {!linux && (
+                    <Button variant="default" size="sm" onClick={openSuite}>
+                      <ExternalLink className="size-3.5" aria-hidden />
+                      Open Valeton Suite
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={() => host.app.showItemInFolder(saved.path).catch((e) => notifyError("Couldn't show the file", e))}>
+                    <FolderOpen className="size-3.5" aria-hidden />
+                    Show file
+                  </Button>
+                </span>
+              )}
+            </Step>
+          </>
+        )}
+      </ol>
+    </>
+  );
+}

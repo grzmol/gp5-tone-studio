@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 640" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="alu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a4b50"/><stop offset=".12" stop-color="#2c2d31"/><stop offset=".88" stop-color="#1c1d20"/><stop offset="1" stop-color="#0d0d0f"/></linearGradient>
+    <linearGradient id="slatshade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".05"/><stop offset=".5" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".35"/></linearGradient>
+    <pattern id="velcro" width="6" height="6" patternUnits="userSpaceOnUse">
+      <rect width="6" height="6" fill="#151518"/>
+      <circle cx="1.2" cy="1.4" r=".7" fill="#232327"/><circle cx="4.1" cy="3.6" r=".6" fill="#1d1d21"/><circle cx="2.8" cy="5" r=".45" fill="#0b0b0d"/><circle cx="5.2" cy="0.9" r=".4" fill="#26262a"/>
+    </pattern>
+    <radialGradient id="spot" cx=".5" cy="-.1" r=".9"><stop offset="0" stop-color="#fff3df" stop-opacity=".22"/><stop offset=".45" stop-color="#fff3df" stop-opacity=".06"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <radialGradient id="rimL" cx="0" cy="1" r=".7"><stop offset="0" stop-color="#ef3b36" stop-opacity=".22"/><stop offset="1" stop-color="#ef3b36" stop-opacity="0"/></radialGradient>
+    <radialGradient id="rimR" cx="1" cy=".9" r=".7"><stop offset="0" stop-color="#4f7cff" stop-opacity=".2"/><stop offset="1" stop-color="#4f7cff" stop-opacity="0"/></radialGradient>
+    <radialGradient id="vig" cx=".5" cy=".5" r=".75"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".7"/></radialGradient>
+  </defs>
+  <rect width="1600" height="640" fill="#070708"/>
+  <rect x="40" y="14" width="1520" height="612" rx="18" fill="#101012" stroke="#2a2b2f" stroke-width="2"/>
+  <g transform="translate(70 36)">
+      <rect width="1460" height="78" rx="6" fill="url(#alu)"/>
+      <rect x="6" y="6" width="1448" height="66" rx="3" fill="url(#velcro)"/>
+      <rect x="6" y="6" width="1448" height="66" rx="3" fill="url(#slatshade)"/>
+      <rect width="1460" height="1.5" fill="#fff" fill-opacity=".18"/>
+    </g><g transform="translate(70 140)">
+      <rect width="1460" height="78" rx="6" fill="url(#alu)"/>
+      <rect x="6" y="6" width="1448" height="66" rx="3" fill="url(#velcro)"/>
+      <rect x="6" y="6" width="1448" height="66" rx="3" fill="url(#slatshade)"/>
+      <rect width="1460" height="1.5" fill="#fff" fill-opacity=".18"/>
+    </g><g transform="translate(70 244)">
+      <rect width="1460" height="78" rx="6" fill="url(#alu)"/>
+      <rect x="6" y="6" width="1448" height="66" rx="3" fill="url(#velcro)"/>
+      <rect x="6" y="6" width="1448" height="66" rx="3" fill="url(#slatshade)"/>
+      <rect width="1460" height="1.5" fill="#fff" fill-opacity=".18"/>
+    </g><g transform="translate(70 348)">
+      <rect width="1460" height="78" rx="6" fill="url(#alu)"/>
+      <rect x="6" y="6" width="1448" height="66" rx="3" fill="url(#velcro)"/>
+      <rect x="6" y="6" width="1448" height="66" rx="3" fill="url(#slatshade)"/>
+      <rect width="1460" height="1.5" fill="#fff" fill-opacity=".18"/>
+    </g><g transform="translate(70 452)">
+      <rect width="1460" height="78" rx="6" fill="url(#alu)"/>
+      <rect x="6" y="6" width="1448" height="66" rx="3" fill="url(#velcro)"/>
+      <rect x="6" y="6" width="1448" height="66" rx="3" fill="url(#slatshade)"/>
+      <rect width="1460" height="1.5" fill="#fff" fill-opacity=".18"/>
+    </g><g transform="translate(70 556)">
+      <rect width="1460" height="78" rx="6" fill="url(#alu)"/>
+      <rect x="6" y="6" width="1448" height="66" rx="3" fill="url(#velcro)"/>
+      <rect x="6" y="6" width="1448" height="66" rx="3" fill="url(#slatshade)"/>
+      <rect width="1460" height="1.5" fill="#fff" fill-opacity=".18"/>
+    </g>
+  <rect x="40" y="14" width="34" height="612" rx="14" fill="url(#alu)"/><rect x="1526" y="14" width="34" height="612" rx="14" fill="url(#alu)"/>
+  <circle cx="57" cy="60" r="4" fill="#5c5d63"/><path d="M54.5 60h5" stroke="#1a1a1c" stroke-width="1.2"/><circle cx="57" cy="320" r="4" fill="#5c5d63"/><path d="M54.5 320h5" stroke="#1a1a1c" stroke-width="1.2"/><circle cx="57" cy="580" r="4" fill="#5c5d63"/><path d="M54.5 580h5" stroke="#1a1a1c" stroke-width="1.2"/><circle cx="1543" cy="60" r="4" fill="#5c5d63"/><path d="M1540.5 60h5" stroke="#1a1a1c" stroke-width="1.2"/><circle cx="1543" cy="320" r="4" fill="#5c5d63"/><path d="M1540.5 320h5" stroke="#1a1a1c" stroke-width="1.2"/><circle cx="1543" cy="580" r="4" fill="#5c5d63"/><path d="M1540.5 580h5" stroke="#1a1a1c" stroke-width="1.2"/>
+  <rect width="1600" height="640" fill="url(#spot)"/>
+  <rect width="1600" height="640" fill="url(#rimL)"/>
+  <rect width="1600" height="640" fill="url(#rimR)"/>
+  <rect width="1600" height="640" fill="url(#vig)"/>
+</svg>

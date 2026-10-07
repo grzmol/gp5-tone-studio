@@ -1,0 +1,61 @@
+# Packaging for GP-5 Tone Studio (design/electron.md › Packaging and updates).
+# Build: `npm run dist` (electron-vite build, then electron-builder for the current OS).
+appId: app.gp5tonestudio.desktop
+productName: GP-5 Tone Studio
+copyright: Copyright © 2026 GP-5 Tone Studio contributors
+
+directories:
+  output: dist
+  buildResources: build
+
+# electron-vite emits main, preload and renderer into out/; nothing else ships.
+files:
+  - out/**/*
+  - package.json
+  - "!**/*.map"
+asarUnpack: []
+
+# Double-clicking a preset (or "Open with GP-5 Tone Studio") starts the app with the path; the
+# single-instance handler forwards it to the running window, which opens it in the Library.
+fileAssociations:
+  - ext: prst
+    name: GP-5 preset
+    description: Valeton GP-5 / GP-50 preset
+    mimeType: application/x-valeton-prst
+    role: Editor
+    rank: Owner
+
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Audio
+  synopsis: Editor and librarian for the Valeton GP-5
+  description: Shape GP-5 presets live, sort and back up its 100 slots, and bring NAM captures and IRs from TONE3000.
+  # WebMIDI goes through ALSA sequencer (/dev/snd/seq); users outside the "audio" group are told how to fix
+  # it by Device › Diagnostics.
+  mimeTypes:
+    - application/x-valeton-prst
+deb:
+  depends:
+    - libasound2
+
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+
+mac:
+  target:
+    - dmg
+  category: public.app-category.music
+  hardenedRuntime: true
+  # Notarization runs when APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID are set (CI release builds).
+  extendInfo:
+    # The capture editor auditions NAM captures through the audio interface input (audio only).
+    NSMicrophoneUsageDescription: Tone Studio plays your guitar through NAM captures in the capture editor.
+dmg:
+  title: GP-5 Tone Studio

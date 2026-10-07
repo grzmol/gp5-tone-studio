@@ -1,0 +1,126 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/inter/opsz.css";
+@import "./tokens.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-led-fault: var(--led-fault);
+  --color-silkscreen: var(--silkscreen);
+  --color-silkscreen-2: var(--silkscreen-2);
+  --color-silkscreen-3: var(--silkscreen-3);
+  --color-silkscreen-4: var(--silkscreen-4);
+  --color-seam: var(--seam);
+  --color-seam-strong: var(--seam-strong);
+  --color-lamp-ink: var(--lamp-ink);
+  --color-lamp-glow: var(--lamp-glow);
+  --color-destructive-fill: var(--destructive-fill);
+  --color-switch-on: var(--switch-on);
+  --color-switch-off: var(--switch-off);
+  --color-surface-solid: var(--surface-solid);
+  --color-surface-solid-raised: var(--surface-solid-raised);
+  --color-glass-edge: var(--glass-edge);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-xs: 6px;
+  --radius-pill: 999px;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-enclosure: var(--enclosure);
+  --color-faceplate: var(--faceplate);
+  --color-faceplate-raised: var(--faceplate-raised);
+  --color-well: var(--well);
+  --color-lamp: var(--lamp);
+  --color-led-on: var(--led-on);
+  --color-led-off: var(--led-off);
+  --color-led-warn: var(--led-warn);
+  --color-cable: var(--cable);
+  --color-brand: var(--brand);
+  --color-block-nr: var(--block-nr);
+  --color-block-pre: var(--block-pre);
+  --color-block-dst: var(--block-dst);
+  --color-block-ns: var(--block-ns);
+  --color-block-amp: var(--block-amp);
+  --color-block-cab: var(--block-cab);
+  --color-block-eq: var(--block-eq);
+  --color-block-mod: var(--block-mod);
+  --color-block-dly: var(--block-dly);
+  --color-block-rvb: var(--block-rvb);
+  --radius-sm: var(--radius-control);
+  --radius-md: 8px;
+  --radius-lg: var(--radius-tile);
+  --radius-xl: var(--radius-dialog);
+}
+
+@layer base {
+  *, *::before, *::after { border-color: var(--border); }
+  html, body, #root { height: 100%; }
+  body {
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.45;
+    color: var(--foreground);
+    background: var(--ambient), var(--enclosure);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+    font-optical-sizing: auto;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.003em;
+    overflow: hidden;
+    user-select: none;
+  }
+  input, textarea, [contenteditable="true"] { user-select: text; }
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  ::selection { background: rgb(255 255 255 / 0.24); color: var(--silkscreen); }
+  ::placeholder { color: var(--silkscreen-3); opacity: 1; }
+  :root { caret-color: var(--silkscreen); scrollbar-color: rgb(255 255 255 / 0.22) transparent; scrollbar-width: thin; accent-color: var(--silkscreen); }
+}
+
+/* Liquid Glass by role (design/DESIGN.md › Elevation & Depth). */
+@utility glass {
+  background: var(--glass-fill);
+  box-shadow: var(--glass-shine), 0 0 0 1px var(--glass-edge);
+}
+@utility glass-float {
+  background: var(--glass-fill);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shine), 0 0 0 1px var(--glass-edge), var(--glass-shadow);
+}
+@utility glass-strong {
+  background: var(--glass-fill-strong);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  backdrop-filter: blur(40px) saturate(180%);
+  box-shadow: var(--glass-shine), 0 0 0 1px var(--glass-edge), 0 30px 80px rgb(0 0 0 / 0.6);
+}
+@utility drag-region { -webkit-app-region: drag; }
+@utility no-drag { -webkit-app-region: no-drag; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+  [data-slot="button"]:active { transform: none !important; }
+}

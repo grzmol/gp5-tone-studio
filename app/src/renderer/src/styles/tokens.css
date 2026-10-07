@@ -1,0 +1,123 @@
+/* GP-5 Tone Studio design tokens — source of truth: design/tokens/theme.css (keep in sync). Dark only. */
+:root {
+  color-scheme: dark;
+
+  /* --- stage + Liquid Glass materials (Apple-style translucent layers over an ambient-lit stage) ---------- */
+  --enclosure: #08080a;                    /* app canvas under the ambient light */
+  --faceplate: rgb(255 255 255 / 0.055);   /* glass panels, tiles (translucent) */
+  --faceplate-raised: rgb(255 255 255 / 0.1); /* hover, selected, popover glass */
+  --well: rgb(0 0 0 / 0.38);               /* inset: inputs, stage channels, knob wells */
+  --surface-solid: #141416;                /* opaque fallback where something must mask what's behind it */
+  --surface-solid-raised: #1d1d20;
+  --glass-fill: linear-gradient(180deg, rgb(255 255 255 / 0.11) 0%, rgb(255 255 255 / 0.04) 45%, rgb(255 255 255 / 0.025) 100%);
+  --glass-fill-strong: linear-gradient(180deg, rgb(48 48 54 / 0.78) 0%, rgb(26 26 30 / 0.72) 100%);
+  --glass-blur: blur(28px) saturate(180%);  /* floating chrome + overlays only (title-bar capsules, rail, dialogs, sheets, picker) */
+  --glass-edge: rgb(255 255 255 / 0.13);
+  --glass-shine: inset 0 1px 0 rgb(255 255 255 / 0.22), inset 0 -1px 0 rgb(255 255 255 / 0.03), inset 1px 0 0 rgb(255 255 255 / 0.04);
+  --glass-shadow: 0 12px 40px rgb(0 0 0 / 0.42), 0 2px 6px rgb(0 0 0 / 0.25);
+  /* ambient stage light behind the glass (block colours, very low) */
+  --ambient: radial-gradient(60% 50% at 12% 0%, rgb(239 59 54 / 0.16), transparent 70%),
+             radial-gradient(50% 45% at 92% 18%, rgb(79 124 255 / 0.13), transparent 70%),
+             radial-gradient(55% 50% at 70% 100%, rgb(168 85 247 / 0.12), transparent 70%),
+             radial-gradient(40% 40% at 30% 85%, rgb(45 212 191 / 0.08), transparent 70%);
+  --silkscreen: #ffffff;                   /* primary text */
+  --silkscreen-2: rgb(255 255 255 / 0.76); /* secondary (≥10:1) */
+  --silkscreen-3: rgb(255 255 255 / 0.6);  /* labels, metadata (≥6:1 on raised glass) */
+  --silkscreen-4: rgb(255 255 255 / 0.5);  /* placeholders, hints (≥4.5:1 on raised glass); disabled controls use opacity */
+  --seam: rgb(255 255 255 / 0.08);         /* hairlines */
+  --seam-strong: rgb(255 255 255 / 0.16);  /* outlines: pills, bypassed blocks, groups */
+  --lamp: #ffffff;                         /* selection / primary action: white, as in Neural DSP UIs */
+  --lamp-ink: #000000;                     /* text on white */
+  --lamp-glow: rgb(255 255 255 / 0.08);    /* fill for selected rows/cards */
+  --led-on: #3ddc84;                       /* engaged / connected */
+  --led-off: #3a3a3d;                      /* bypassed */
+  --led-fault: #ff453a;                    /* errors, destructive */
+  --led-warn: #ffd60a;                     /* warnings */
+  --destructive-fill: #c9302c;             /* destructive buttons: white text 5.3:1 (--led-fault stays for icons/LEDs) */
+  --switch-on: #34c759;                    /* iOS-style switch, engaged */
+  --switch-off: rgb(120 120 128 / 0.36);   /* iOS-style switch, off */
+  --avatar-fill: var(--surface-solid-raised);
+  --cable: #3a3a3d;                        /* grid / signal lines between blocks */
+  --brand: #8b7cf6;                        /* rare brand moments only (splash, about): Neural-style violet */
+
+  /* device colors (Quad Cortex-like saturated category colors). Fill block icons, color knob rings of the
+     selected device, legends. Never used for buttons or body text. */
+  --block-nr: #8e8e93;
+  --block-pre: #facc15;
+  --block-dst: #ff7a1a;
+  --block-ns: #ec4899;
+  --block-amp: #ef3b36;
+  --block-cab: #c2865a;
+  --block-eq: #a3e635;
+  --block-mod: #4f7cff;
+  --block-dly: #2dd4bf;
+  --block-rvb: #a855f7;
+
+  /* --- shadcn/ui semantic tokens ---------------------------------------------------------------------------- */
+  --background: var(--enclosure);
+  --foreground: var(--silkscreen);
+  --card: var(--faceplate);
+  --card-foreground: var(--silkscreen);
+  --popover: var(--faceplate-raised);
+  --popover-foreground: var(--silkscreen);
+  --primary: var(--lamp);
+  --primary-foreground: var(--lamp-ink);
+  --secondary: #232326;
+  --secondary-foreground: var(--silkscreen);
+  --muted: #1b1b1d;
+  --muted-foreground: var(--silkscreen-3);
+  --accent: #232326;                       /* shadcn "accent" = neutral hover fill */
+  --accent-foreground: var(--silkscreen);
+  --destructive: var(--led-fault);
+  --border: var(--seam);
+  --input: var(--seam-strong);
+  --ring: rgb(255 255 255 / 0.85);
+  --sidebar: var(--enclosure);
+  --sidebar-foreground: var(--silkscreen-3);
+  --sidebar-primary: var(--lamp);
+  --sidebar-primary-foreground: var(--lamp-ink);
+  --sidebar-accent: #1b1b1d;
+  --sidebar-accent-foreground: var(--silkscreen);
+  --sidebar-border: var(--seam);
+  --sidebar-ring: var(--ring);
+
+  /* --- shape, type, space, motion ---------------------------------------------------------------------------- */
+  --radius: 1rem;
+  --radius-xs: 6px;                        /* kbd, micro chips */
+  --radius-control: 10px;                   /* inputs, small toggles */
+  --radius-pill: 999px;                     /* buttons, chips, segmented controls (capsules) */
+  --radius-tile: 16px;                      /* gear tiles, cards */
+  --radius-dialog: 22px;                    /* glass panels, dialogs, sheets (concentric with 16px content) */
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter Variable", "Inter", "Segoe UI Variable", system-ui, sans-serif;
+  --tracking-display: -0.022em;              /* SF Display-like tight tracking on large titles */
+  --tracking-title: -0.012em;
+  --stretch-silkscreen: 100%;               /* (Inter/SF have no width axis) */
+  --stretch-body: 100%;
+  --stretch-display: 100%;
+  --label-tracking: 0.04em;                 /* small uppercase labels (nav, eyebrows, section titles) */
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 15px;
+  --text-lg: 18px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+  --text-3xl: 44px;
+
+  --space: 4px;
+  --titlebar-h: 52px;
+  --rail-w: 84px;                           /* floating glass sidebar incl. its 10px inset */
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-move: cubic-bezier(0.77, 0, 0.175, 1);
+  --dur-press: 120ms;
+  --dur-pop: 160ms;
+  --dur-panel: 220ms;
+
+  --z-base: 0;
+  --z-chain-drag: 10;
+  --z-sticky: 20;
+  --z-overlay: 40;
+  --z-toast: 50;
+}
