@@ -149,6 +149,7 @@ Diagnostics check each step of the connection to the pedal, and a live MIDI moni
 ## Tones from TONE3000.
 
 Browse and download NAM captures and IRs from TONE3000, and see which slots on your GP-5 already hold them.<br>
+A NAM A1 capture becomes a SnapTone right in the app and goes straight to a user slot over USB. No Valeton Suite needed.<br>
 The capture editor plays your guitar through a capture, using the input of your audio interface.
 
 <br>
@@ -172,6 +173,7 @@ The capture editor plays your guitar through a capture, using the input of your 
 | **Connection** | WebMIDI with SysEx, straight to the pedal over USB |
 | **App** | Electron 43, React 19, TypeScript, Tailwind CSS v4 |
 | **Presets** | Reads and writes `.prst` files, byte for byte |
+| **SnapTones** | Converts NAM A1 captures the way Valeton Suite does, then uploads them over USB |
 | **Safety** | Backs up a slot automatically before it's overwritten |
 | **Packages** | `.dmg`, NSIS installer, AppImage and `.deb` |
 
