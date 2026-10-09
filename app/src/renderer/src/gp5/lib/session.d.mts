@@ -13,6 +13,8 @@ export interface Gp5Timing {
   readTimeoutMs: number;
   ackTimeoutMs: number;
   postSelectMs: number;
+  snapToneAckTimeoutMs: number;
+  snapToneResends: number;
   readRetries: number;
 }
 export const DEFAULT_TIMING: Readonly<Gp5Timing>;
@@ -57,6 +59,12 @@ export interface WriteResult {
   attempts: number;
   verified: boolean;
 }
+export interface SnapToneUploadResult {
+  frames: number;
+  /** The name as stored on the pedal (Suite's name rule applied) */
+  name: string;
+  slot: number;
+}
 export interface SyncSnapshot {
   names: PresetNameRecord[];
   slot: number;
@@ -99,6 +107,13 @@ export class Gp5Session extends EventTarget {
     prst: Uint8Array,
     opts: { confirm: true; verify?: boolean; onProgress?: (done: number, total: number) => void; attempts?: number },
   ): Promise<WriteResult>;
+  /** Upload a 2696-byte SnapTone file into user SnapTone slot 50..79; verified via the 0x24 table. */
+  uploadSnapTone(
+    slot: number,
+    name: string,
+    file: Uint8Array,
+    opts: { confirm: true; onProgress?: (done: number, total: number) => void },
+  ): Promise<SnapToneUploadResult>;
   syncState(): Promise<SyncSnapshot>;
 }
 

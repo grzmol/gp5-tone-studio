@@ -4,6 +4,7 @@
 
 import { BLOCKS, CC, CMD, FRAME_PAYLOAD_MAX, GLOBALS, KIND, PRESET_COUNT, READ, Reassembler, packetize, parseSysex, u32le } from "./protocol.mjs";
 import { BODY_OFF, GP5_BODY_LEN, applyEdits, bodyOf, readName, rebuildPrst } from "./prst.mjs";
+import { checkSnapToneFile, decodeImportSnapTone, isUserSnapToneSlot } from "./snaptone.mjs";
 
 const ACK = [KIND.ACK, 0x08, 0x00]; // device ACK frame BUF b2 01 00 03 14 08 00
 const readU32 = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
@@ -29,6 +30,7 @@ export class MockGp5 {
     // flag 0 = user content, 1 = factory/empty (as on hardware)
     this.snapTones = Array.from({ length: 80 }, (_, i) => (snapTones[i] ? { name: snapTones[i], flag: i < 50 ? 1 : 0 } : { name: i < 50 ? `Factory ${i + 1}` : "Empty", flag: 1 }));
     this.userIRs = Array.from({ length: 20 }, (_, i) => (userIRs[i] ? { name: userIRs[i], flag: 0 } : { name: `User IR ${i + 1}`, flag: 1 }));
+    this.snapToneFiles = new Map(); // slot -> uploaded 2696-byte SnapTone file
     this.latencyMs = latencyMs;
     this.minGapMs = minGapMs;
     this.acceptProgramChange = acceptProgramChange;
@@ -150,6 +152,14 @@ export class MockGp5 {
         const rest = p.subarray(6); // name(16) + body
         this.slots[slot] = { name: String.fromCharCode(...rest.subarray(0, 16).filter((c) => c)), body: rest.slice(16) };
         if (slot === this.current) this.buffer = this.slots[slot].body.slice();
+        return;
+      }
+      case CMD.IMPORT_SNAPTONE: {
+        // Stored only when well-formed; the pedal's reaction to a bad file is unknown, so nothing else is modelled.
+        const up = decodeImportSnapTone(p);
+        if (!up || !isUserSnapToneSlot(up.slot) || checkSnapToneFile(up.file)) return;
+        this.snapTones[up.slot] = { name: up.name, flag: 0 };
+        this.snapToneFiles.set(up.slot, up.file);
         return;
       }
     }

@@ -34,6 +34,7 @@ export const READ = Object.freeze({
 /** Command function codes (payload [0x11, fn, ...]). */
 export const CMD = Object.freeze({
   SET_GLOBAL: 0x11,
+  IMPORT_SNAPTONE: 0x25, // SnapTone file upload (lib/snaptone.mjs)
   SET_PATCH_SETTING: 0x42,
   SELECT_PRESET: 0x43,
   SET_MODEL: 0x47,
