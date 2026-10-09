@@ -9,7 +9,7 @@
  * bit-identical, IRs within 1.1e-5 relative (last-ulp libm differences, the
  * same spread the DLL shows between two C runtimes). Every float32 operation
  * is rounded like the SSE2 original and keeps the disassembly's operation
- * order. Algorithm and blob layout: .claude/skills/gp5-reverse-engineering/snaptone.md.
+ * order. Blob layout: buildBlob below; overview: app/README.md "SnapTones".
  *
  * Sections: tables, float helpers, constants, CJJFFT + partitioned convolver,
  * Ooura FFT, biquads, 4x oversampled amp-curve shaper, spectral helpers
