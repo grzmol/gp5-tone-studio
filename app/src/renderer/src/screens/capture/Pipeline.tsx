@@ -12,10 +12,11 @@ import { host } from "@/host";
 import { notifySuccess } from "@/app/notify";
 import { cn } from "@/lib/utils";
 import { convertToSnapTone } from "@/snaptone/convert";
+import { useTestSignal } from "@/snaptone/signal";
 import { useDevice } from "@/state/device";
 import { useNav } from "@/state/nav";
 import { UseOnGp5 } from "@/screens/tones/SendSteps";
-import { SnapToneSlotPicker } from "@/screens/tones/SnapToneSteps";
+import { SnapToneSlotPicker, TestSignalNotice } from "@/screens/tones/SnapToneSteps";
 import { openSheet, startSendDraft, useTones } from "@/screens/tones/store";
 import { isFlat } from "./nam/shaping";
 import { exportText, useCapture } from "./store";
@@ -276,6 +277,7 @@ function LocalSend({ title, exportFile }: { title: string; exportFile: () => str
   const connected = useDevice((s) => s.status === "connected");
   const snapTones = useDevice((s) => s.snapTones);
   const deviceBusy = useDevice((s) => s.busy);
+  const hasSignal = useTestSignal((s) => s.has);
   const [name, setName] = useState(() => proposeSlotName(title));
   const [slot, setSlot] = useState<number | null>(null);
   const [phase, setPhase] = useState<LocalPhase>("idle");
@@ -340,11 +342,18 @@ function LocalSend({ title, exportFile }: { title: string; exportFile: () => str
         {replacing && !working && written?.slot !== slot && <Sub>Replaces {replacing}. A SnapTone can't be read back from the pedal.</Sub>}
         {working && <Progress value={progress * 100} className="mt-2 w-56" aria-label={phase === "converting" ? "SnapTone conversion progress" : "SnapTone write progress"} />}
         {working && <Sub>{phase === "converting" ? "Making the SnapTone…" : `Writing slot ${slot}…`}</Sub>}
-        <Button variant="default" size="sm" className="mt-2 self-start" disabled={!connected || slot === null || !name || working || Boolean(deviceBusy)} onClick={() => void send()}>
+        <Button
+          variant="default"
+          size="sm"
+          className="mt-2 self-start"
+          disabled={!connected || slot === null || !name || working || Boolean(deviceBusy) || hasSignal === false}
+          onClick={() => void send()}
+        >
           {working ? <Spinner className="size-3.5" /> : <Send className="size-3.5" aria-hidden />}
           {replacing ? `Replace ${replacing} in slot ${slot}` : slot !== null ? `Write to slot ${slot}` : "Write to the GP-5"}
         </Button>
         {!connected && <Sub>Connect the GP-5 to write it.</Sub>}
+        <TestSignalNotice />
         {error && (
           <span className="text-led-fault" role="alert">
             {error}

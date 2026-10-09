@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import { RotateCcw } from "lucide-react";
+import { FileAudio, RotateCcw } from "lucide-react";
+import { SIGNAL_IN_SUITE } from "@shared/host/snaptone";
 import type { T3kModel } from "@shared/host/tones";
 import { firstEmptySlot, isEmptySlotName, sanitizeSlotName } from "@shared/tone3000";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { host, isElectron } from "@/host";
+import { checkTestSignal, chooseTestSignal, useTestSignal } from "@/snaptone/signal";
 import { useDevice } from "@/state/device";
 import { readSlots, runSend, updateDraft, writeSnapTone, type SendState } from "./store";
 import { Step, StepError, UseOnGp5, kb, type StepStatus } from "./SendSteps";
@@ -23,6 +26,7 @@ export function SnapToneSteps({ send, model }: { send: SendState; model: T3kMode
   const connected = useDevice((s) => s.status === "connected");
   const snapTones = useDevice((s) => s.snapTones);
   const busy = useDevice((s) => s.busy);
+  const hasSignal = useTestSignal((s) => s.has);
 
   useEffect(() => {
     if (phase === "idle") return;
@@ -83,11 +87,12 @@ export function SnapToneSteps({ send, model }: { send: SendState; model: T3kMode
         )}
         {(phase === "idle" || (phase === "error" && step < 4)) && (
           <span className="mt-2 flex flex-col items-start gap-1">
-            <Button size="sm" disabled={!send.name || !model} onClick={() => void runSend(send.toneId)}>
+            <Button size="sm" disabled={!send.name || !model || hasSignal === false} onClick={() => void runSend(send.toneId)}>
               {phase === "error" && <RotateCcw data-icon="inline-start" />}
               {phase === "error" ? "Retry" : replacing && connected ? `Send, replacing ${replacing}` : "Send to GP-5"}
             </Button>
             {!connected && <span className="text-[11px] text-silkscreen-3">Connect the GP-5 to write it; the conversion runs without it.</span>}
+            <TestSignalNotice />
           </span>
         )}
       </Step>
@@ -151,5 +156,35 @@ export function SnapToneSlotPicker({ value, onChange, disabled }: { value: numbe
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+/** Where to find nam_input_wav.wav, for this platform. */
+function signalWhere(): string {
+  if (host.platform === "win32" || host.platform === "darwin") return `In Valeton Suite: ${SIGNAL_IN_SUITE[host.platform]}.`;
+  return `In Valeton Suite: ${SIGNAL_IN_SUITE.win32} on Windows, or ${SIGNAL_IN_SUITE.darwin} on macOS. The Windows installer opens with 7-Zip.`;
+}
+
+/**
+ * Shown while Tone Studio doesn't have Valeton's test signal: making a SnapTone plays it through the capture, and
+ * it is Valeton's file, so the user points to it once.
+ */
+export function TestSignalNotice() {
+  const has = useTestSignal((s) => s.has);
+  const choosing = useTestSignal((s) => s.choosing);
+  useEffect(() => void checkTestSignal(), []);
+  if (has !== false) return null;
+  return (
+    <span className="mt-1 flex flex-col items-start gap-1">
+      <span className="text-pretty text-silkscreen-2">
+        Making a SnapTone needs Valeton's test signal, nam_input_wav.wav. It is Valeton's file, so Tone Studio doesn't include it.{" "}
+        {isElectron ? "Choose it once and Tone Studio keeps a copy." : "Choose it once per visit."}
+      </span>
+      <span className="text-[11px] break-all text-silkscreen-3">{signalWhere()}</span>
+      <Button size="sm" variant="outline" disabled={choosing} onClick={() => void chooseTestSignal()}>
+        {choosing ? <Spinner data-icon="inline-start" /> : <FileAudio data-icon="inline-start" />}
+        Choose nam_input_wav.wav…
+      </Button>
+    </span>
   );
 }

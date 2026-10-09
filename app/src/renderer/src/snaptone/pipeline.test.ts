@@ -1,12 +1,15 @@
 /// <reference types="node" />
 // @vitest-environment node
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { checkCloneBlob } from "@/gp5/lib/snaptone.mjs";
-import { decodeExcitation, namToCloneBlob, pcmRoundTrip } from "./pipeline";
+import { readSignalWav, SIGNAL_FRAMES } from "@shared/host/snaptone";
+import { namToCloneBlob, pcmRoundTrip } from "./pipeline";
 
 const file = (p: string) => readFileSync(join(__dirname, p));
+/** Valeton's nam_input_wav.wav, git-ignored: copy it from a Valeton Suite install to run the comparison. */
+const SIGNAL = join(__dirname, "fixtures/nam_input_wav.wav");
 const f32 = (b: Uint8Array, from: number, to: number) => new Float32Array(b.buffer.slice(b.byteOffset + from, b.byteOffset + to));
 
 /** max |a - b| / max |b| */
@@ -28,10 +31,9 @@ describe("pcmRoundTrip", () => {
 });
 
 describe("namToCloneBlob", () => {
-  it("matches the clone Valeton Suite 2.1.0 makes from the same model", { timeout: 120_000 }, async () => {
-    const bin = file("excitation.bin");
-    const excitation = await decodeExcitation(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength));
-    expect(excitation.length).toBe(70 * 44100);
+  it.skipIf(!existsSync(SIGNAL))("matches the clone Valeton Suite 2.1.0 makes from the same model", { timeout: 120_000 }, async () => {
+    const excitation = readSignalWav(new Uint8Array(readFileSync(SIGNAL)));
+    expect(excitation.length).toBe(SIGNAL_FRAMES);
     const blob = await namToCloneBlob(file("fixtures/wavenet_a1_standard.nam").toString("utf8"), excitation, file("a1kernel.wasm"));
     const suite = new Uint8Array(file("../gp5/fixtures/snaptone-a1std.clo"));
 

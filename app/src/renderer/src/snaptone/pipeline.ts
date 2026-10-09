@@ -6,34 +6,16 @@
  *  3. HTKPA::startClone on the two signals as JUCE reads them back.
  * The 16/24-bit round trips are part of the recipe: the clone reacts to single LSBs.
  */
+import { SIGNAL_RATE } from "@shared/host/snaptone";
 import { cloneSnapTone, convertSampleRate } from "./htkpa";
 import { parseA1, renderA1 } from "./wavenet";
 
-/** Rate of Suite's excitation file. */
-export const EXCITATION_RATE = 44100;
 /** getNamOutput's fixed output gain (0.31f at 0x19fc28). */
 const NAM_OUTPUT_GAIN = Math.fround(0.31);
 /** getNamOutput: models without a sample rate are rendered at 48 kHz. */
 const DEFAULT_MODEL_RATE = 48000;
 /** Rates HTKPA has excitation FIR tables for. */
 const CLONE_RATES = [44100, 48000, 96000];
-
-/**
- * excitation.bin -> the 16-bit samples of channel 0 of nam_input_wav.wav.
- * Format: raw deflate of the low bytes then the high bytes of the first differences (mod 2^16).
- */
-export async function decodeExcitation(bin: ArrayBuffer): Promise<Int16Array> {
-  const inflated = new Response(bin).body!.pipeThrough(new DecompressionStream("deflate-raw"));
-  const raw = new Uint8Array(await new Response(inflated).arrayBuffer());
-  const n = raw.length / 2;
-  const out = new Int16Array(n);
-  let acc = 0;
-  for (let i = 0; i < n; i++) {
-    acc = (acc + (raw[i] | (raw[n + i] << 8))) & 0xffff;
-    out[i] = acc;
-  }
-  return out;
-}
 
 /**
  * Write `x` as `bits`-bit PCM and read it back, exactly like JUCE's WAV writer and reader:
@@ -53,8 +35,8 @@ export function pcmRoundTrip(x: Float32Array, bits: 16 | 24): Float32Array {
 export type ClonePhase = "excitation" | "render" | "clone";
 
 /**
- * Run the whole conversion. `namText` is a NAM A1 standard model in the 0.5.x layout, `excitation` the decoded
- * excitation.bin, `kernel` the a1kernel.wasm bytes.
+ * Run the whole conversion. `namText` is a NAM A1 standard model in the 0.5.x layout, `excitation` channel 0 of
+ * nam_input_wav.wav (shared/host/snaptone.ts readSignalWav), `kernel` the a1kernel.wasm bytes.
  */
 export async function namToCloneBlob(
   namText: string,
@@ -67,7 +49,7 @@ export async function namToCloneBlob(
   if (!CLONE_RATES.includes(rate)) throw new Error(`SnapTones can be made from 44.1, 48 or 96 kHz models; this one is ${rate / 1000} kHz`);
   onProgress("excitation", 0);
   const source = Float32Array.from(excitation, (v) => v / 32768);
-  const input = pcmRoundTrip(rate === EXCITATION_RATE ? source : convertSampleRate(source, EXCITATION_RATE, rate), 24);
+  const input = pcmRoundTrip(rate === SIGNAL_RATE ? source : convertSampleRate(source, SIGNAL_RATE, rate), 24);
   const rendered = await renderA1(kernel, model, input, (f) => onProgress("render", f));
   for (let i = 0; i < rendered.length; i++) rendered[i] = Math.fround(rendered[i] * NAM_OUTPUT_GAIN);
   onProgress("clone", 0);

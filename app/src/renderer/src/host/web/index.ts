@@ -4,6 +4,7 @@ import { webFiles } from "./files";
 import { webTones } from "./tones";
 import { webCapture } from "./capture";
 import { webDevice } from "./device";
+import { webSnapTone } from "./snaptone";
 
 export const webHost: HostApi = {
   kind: "web",
@@ -13,4 +14,5 @@ export const webHost: HostApi = {
   tones: webTones,
   capture: webCapture,
   device: webDevice,
+  snaptone: webSnapTone,
 };

@@ -36,13 +36,13 @@ Electron is pinned to 43.x because Chromium 152 (Electron 44) breaks WebMIDI Sys
 
 ## SnapTones
 `src/renderer/src/snaptone/` reproduces Valeton Suite 2.1.0's NAM → SnapTone converter, so captures go to the pedal without Suite:
-- `pipeline.ts`: the excitation (`excitation.bin`, channel 0 of Suite's `nam_input_wav.wav`) is resampled to the model rate, the model renders it, and `htkpa.ts` measures the pair into the 8840-byte clone.
+- `pipeline.ts`: the excitation (channel 0 of Suite's `nam_input_wav.wav`) is resampled to the model rate, the model renders it, and `htkpa.ts` measures the pair into the 8840-byte clone.
 - `wavenet.ts` + `a1kernel.wasm`: NAM A1 WaveNet with fast tanh, as Suite renders it.
 - `htkpa.ts`: port of Suite's native HTKPA clone and its r8brain resampler. The test checks it against a clone made by Suite itself (`gp5/fixtures/snaptone-a1std.clo`).
 - `worker.ts` / `convert.ts`: run it off the UI thread (about 10–20 s).
 - The upload is `Gp5Session.uploadSnapTone` (`gp5/lib/snaptone.mjs`): command `11 25`, 146 frames, one ACK each, verified in the 0x24 table.
 
-`excitation.bin` is Valeton's test signal; regenerate it from a Suite install with `node scripts/make-excitation.mjs <path to nam_input_wav.wav>`. IR upload is still unknown, so IRs keep the Valeton Suite hand-off.
+`nam_input_wav.wav` is Valeton's test signal, so it isn't in the repo. The app asks for it once ("Choose nam_input_wav.wav…" in the send steps) and keeps a checked copy in `userData/snaptone/`; on Windows and macOS it is also picked up from the Valeton Suite install (`src/main/ipc/snaptone.ts`). The browser build keeps it in memory. To run the comparison test, copy it to `src/renderer/src/snaptone/fixtures/` (git-ignored); without it that test is skipped. IR upload is still unknown, so IRs keep the Valeton Suite hand-off.
 
 ## TONE3000
 Sign-in needs a TONE3000 app key (client_id). Set it with `MAIN_VITE_T3K_CLIENT_ID` at build time, or `T3K_CLIENT_ID` at runtime, or `userData/tone3000.json`. See `../design/tone3000.md`. Tokens are encrypted with Electron `safeStorage`. When the OS keychain is unavailable, for example KWallet not initialised, they are kept in memory only.

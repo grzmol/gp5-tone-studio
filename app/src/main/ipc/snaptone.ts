@@ -1,0 +1,68 @@
+import { app, dialog, type BrowserWindow, type OpenDialogOptions } from "electron";
+import { copyFile, mkdir, readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { readSignalWav } from "@shared/host/snaptone";
+import { HostError } from "@shared/ipc";
+import { loadSettings } from "./app";
+import { handle } from "./handle";
+
+// Valeton's test signal for the SnapTone conversion (see src/shared/host/snaptone.ts). A checked copy is kept in
+// userData/snaptone; until then it is looked up in the Valeton Suite install.
+const SIGNAL_NAME = "nam_input_wav.wav";
+const storedPath = () => join(app.getPath("userData"), "snaptone", SIGNAL_NAME);
+const MAC_SUITE = "/Applications/Valeton Suite.app";
+
+/** Where Suite keeps the file for a given Suite path (the .exe on Windows, the .app on macOS). */
+function inSuite(suitePath: string): string | null {
+  if (process.platform === "darwin") return join(suitePath, "Contents/Frameworks/App.framework/Resources/flutter_assets/assets/wavs", SIGNAL_NAME);
+  if (process.platform === "win32") return join(dirname(suitePath), "data", "flutter_assets", "assets", "wavs", SIGNAL_NAME);
+  return null;
+}
+
+/** Check `bytes` is the test signal and keep a copy of `source`. Throws HostError("invalid") when it isn't. */
+async function keep(source: string, bytes: Uint8Array): Promise<Uint8Array> {
+  try {
+    readSignalWav(bytes);
+  } catch (e) {
+    throw new HostError("invalid", e instanceof Error ? e.message : String(e));
+  }
+  await mkdir(dirname(storedPath()), { recursive: true });
+  await copyFile(source, storedPath());
+  return bytes;
+}
+
+/** The kept copy, else the file from the Suite install (then kept), else null. */
+async function findSignal(): Promise<Uint8Array | null> {
+  const stored = await readFile(storedPath()).catch(() => null);
+  if (stored) return new Uint8Array(stored);
+  const suitePath = (await loadSettings()).valetonSuitePath;
+  const suites = [suitePath, process.platform === "darwin" ? MAC_SUITE : null].filter((p): p is string => Boolean(p));
+  for (const suite of suites) {
+    const candidate = inSuite(suite);
+    const bytes = candidate ? await readFile(candidate).catch(() => null) : null;
+    if (!candidate || !bytes) continue;
+    try {
+      return await keep(candidate, new Uint8Array(bytes));
+    } catch {
+      // Not the file we expect (another Suite version?): the user chooses it instead.
+    }
+  }
+  return null;
+}
+
+export function registerSnapToneIpc(getWindow: () => BrowserWindow | null): void {
+  handle("snaptone:hasSignal", async () => (await findSignal()) !== null);
+  handle("snaptone:signal", () => findSignal());
+  handle("snaptone:chooseSignal", async () => {
+    const win = getWindow();
+    const opts: OpenDialogOptions = {
+      title: `Choose Valeton's ${SIGNAL_NAME}`,
+      properties: ["openFile"],
+      filters: [{ name: "WAV audio", extensions: ["wav"] }],
+    };
+    const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
+    const path = res.canceled ? null : res.filePaths[0];
+    if (!path) return null;
+    return keep(path, new Uint8Array(await readFile(path)));
+  });
+}

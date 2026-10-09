@@ -1,7 +1,10 @@
+import { host } from "@/host";
 import type { ClonePhase } from "./pipeline";
 
 export interface ConvertRequest {
   namText: string;
+  /** Valeton's nam_input_wav.wav (see shared/host/snaptone.ts) */
+  signalWav: Uint8Array;
 }
 
 export type ConvertReply =
@@ -16,8 +19,10 @@ const PHASE_SPAN: Record<ClonePhase, [number, number]> = { excitation: [0, 0.07]
  * Convert a NAM A1 standard model (0.5.x JSON, see shared/nam.ts prepareNam) into a 2696-byte SnapTone file,
  * in a Web Worker. `onProgress` gets an overall fraction 0..1 (the clone phase reports only its start).
  */
-export function convertToSnapTone(namText: string, onProgress?: (fraction: number) => void, signal?: AbortSignal): Promise<Uint8Array> {
-  if (signal?.aborted) return Promise.reject(new DOMException("Conversion cancelled", "AbortError"));
+export async function convertToSnapTone(namText: string, onProgress?: (fraction: number) => void, signal?: AbortSignal): Promise<Uint8Array> {
+  const signalWav = await host.snaptone.signal();
+  if (!signalWav) throw new Error("Making a SnapTone needs Valeton's test signal (nam_input_wav.wav). Choose it first.");
+  if (signal?.aborted) throw new DOMException("Conversion cancelled", "AbortError");
   const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
   return new Promise<Uint8Array>((resolve, reject) => {
     const finish = () => {
@@ -44,6 +49,6 @@ export function convertToSnapTone(namText: string, onProgress?: (fraction: numbe
       finish();
       reject(new Error(e.message || "The SnapTone converter stopped"));
     };
-    worker.postMessage({ namText } satisfies ConvertRequest);
+    worker.postMessage({ namText, signalWav } satisfies ConvertRequest, [signalWav.buffer]);
   });
 }
