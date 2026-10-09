@@ -1,0 +1,46 @@
+/// <reference types="node" />
+// @vitest-environment node
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { checkCloneBlob } from "@/gp5/lib/snaptone.mjs";
+import { decodeExcitation, namToCloneBlob, pcmRoundTrip } from "./pipeline";
+
+const file = (p: string) => readFileSync(join(__dirname, p));
+const f32 = (b: Uint8Array, from: number, to: number) => new Float32Array(b.buffer.slice(b.byteOffset + from, b.byteOffset + to));
+
+/** max |a - b| / max |b| */
+function relError(a: Float32Array, b: Float32Array): number {
+  let err = 0;
+  let peak = 0;
+  for (let i = 0; i < b.length; i++) {
+    err = Math.max(err, Math.abs(a[i] - b[i]));
+    peak = Math.max(peak, Math.abs(b[i]));
+  }
+  return err / peak;
+}
+
+describe("pcmRoundTrip", () => {
+  it("quantizes like JUCE: round to nearest, clamp, keep the top bits", () => {
+    const out = pcmRoundTrip(Float32Array.of(0.5, -1.5, 1.5, 0.3 / 32768, 0.7 / 32768), 16);
+    expect(Array.from(out, (v) => v * 32768)).toEqual([16384, -32768, 32767, 0, 0]);
+  });
+});
+
+describe("namToCloneBlob", () => {
+  it("matches the clone Valeton Suite 2.1.0 makes from the same model", { timeout: 120_000 }, async () => {
+    const bin = file("excitation.bin");
+    const excitation = await decodeExcitation(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength));
+    expect(excitation.length).toBe(70 * 44100);
+    const blob = await namToCloneBlob(file("fixtures/wavenet_a1_standard.nam").toString("utf8"), excitation, file("a1kernel.wasm"));
+    const suite = new Uint8Array(file("../gp5/fixtures/snaptone-a1std.clo"));
+
+    expect(checkCloneBlob(blob)).toBeNull();
+    // Header and filter coefficients are exact; the amp curve and IRs differ by float rounding only.
+    expect(blob.subarray(0x0a, 0x68)).toEqual(suite.subarray(0x0a, 0x68));
+    expect(blob.subarray(0x78, 0x88)).toEqual(suite.subarray(0x78, 0x88));
+    expect(relError(f32(blob, 0x68, 0x78), f32(suite, 0x68, 0x78))).toBeLessThan(1e-3);
+    expect(relError(f32(blob, 0x88, 0x288), f32(suite, 0x88, 0x288))).toBeLessThan(1e-3);
+    expect(relError(f32(blob, 0x288, 0x2288), f32(suite, 0x288, 0x2288))).toBeLessThan(1e-3);
+  });
+});

@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
     "test:toolkit": "node --test src/renderer/src/gp5/tests/",
+    "build:wasm": "clang --target=wasm32 -O3 -msimd128 -nostdlib -Wl,--no-entry -Wl,--export=a1_process -Wl,--export=__heap_base -Wl,--import-memory -o src/renderer/src/snaptone/a1kernel.wasm src/renderer/src/snaptone/a1kernel.c",
     "dist": "electron-vite build && electron-builder"
   },
   "devDependencies": {
