@@ -337,7 +337,7 @@ function LocalSend({ title, exportFile }: { title: string; exportFile: () => str
           </InputGroup>
           <SnapToneSlotPicker value={slot} onChange={setSlot} disabled={working} />
         </div>
-        {replacing && !working && <Sub>Replaces {replacing}. A SnapTone can't be read back from the pedal.</Sub>}
+        {replacing && !working && written?.slot !== slot && <Sub>Replaces {replacing}. A SnapTone can't be read back from the pedal.</Sub>}
         {working && <Progress value={progress * 100} className="mt-2 w-56" aria-label={phase === "converting" ? "SnapTone conversion progress" : "SnapTone write progress"} />}
         {working && <Sub>{phase === "converting" ? "Making the SnapTone…" : `Writing slot ${slot}…`}</Sub>}
         <Button variant="default" size="sm" className="mt-2 self-start" disabled={!connected || slot === null || !name || working || Boolean(deviceBusy)} onClick={() => void send()}>
