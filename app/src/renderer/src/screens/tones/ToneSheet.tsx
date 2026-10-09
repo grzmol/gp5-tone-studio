@@ -15,6 +15,7 @@ import { notifyError } from "@/app/notify";
 import { browse, cancelSend, closeSheet, loadAccount, startSendDraft, updateDraft, useTones } from "./store";
 import { CreatorAvatar } from "./ToneCard";
 import { SendSteps, UseOnGp5 } from "./SendSteps";
+import { SnapToneSteps } from "./SnapToneSteps";
 import { ToneImage } from "./ToneImage";
 
 /** Tone detail (TONE3000 requirement 6) with the model picker and the Send to GP-5 flow. */
@@ -215,15 +216,17 @@ function SheetBody({ toneId, initial }: { toneId: number; initial: T3kTone | nul
               <span className="text-silkscreen-3">Step {stepNo} of 5</span>
             </div>
             {send.text && <p className="text-[12px] text-silkscreen-2">Sends your edited version from the capture editor, made from the selected model.</p>}
-            <SendSteps send={send} model={selected} isIr={isIr} />
+            {isIr ? <SendSteps send={send} model={selected} /> : <SnapToneSteps send={send} model={selected} />}
           </section>
         )}
       </div>
 
       <SheetFooter className="mt-0 flex-row items-center gap-4 border-t border-border py-3 pr-5 pl-6 text-[11px] [@media(max-height:800px)]:py-2.5">
-        <span className="flex-1 text-pretty text-silkscreen-3">Direct upload over USB isn't possible yet, so Valeton Suite does the import.</span>
+        <span className="flex-1 text-pretty text-silkscreen-3">
+          {isIr ? "IR upload over USB isn't known yet, so Valeton Suite does the import." : "Tone Studio writes the SnapTone over USB. Valeton Suite isn't needed."}
+        </span>
         {send && send.phase !== "idle" && send.phase !== "linked" && (
-          <Button variant="ghost" size="sm" disabled={send.phase === "running"} onClick={() => cancelSend(toneId)}>
+          <Button variant="ghost" size="sm" disabled={send.phase === "running" || send.phase === "writing"} onClick={() => cancelSend(toneId)}>
             Cancel send
           </Button>
         )}

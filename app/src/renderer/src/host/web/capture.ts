@@ -121,7 +121,4 @@ export const webCapture: CaptureApi = {
     download(suggestedName.endsWith(".nam") ? suggestedName : `${suggestedName}.nam`, text);
     return suggestedName;
   },
-  saveForSuite: async () => {
-    throw new HostError("unsupported", "Valeton Suite hand-off needs the desktop app");
-  },
 };

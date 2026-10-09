@@ -30,7 +30,7 @@ export function verdictOf(info: NamInfo, linkedSlot: number | null): Verdict {
   }
   if (info.arch.kind === "A1") {
     if (linkedSlot !== null) return { tone: "on", label: `Linked to slot ${linkedSlot} on your GP-5`, reason: "This tone is linked to a user SnapTone slot on your GP-5." };
-    return { tone: "on", label: "Ready for GP-5", reason: "NAM A1 standard: Valeton Suite can import it." };
+    return { tone: "on", label: "Ready for GP-5", reason: "NAM A1 standard: Tone Studio can turn it into a SnapTone and write it to the pedal." };
   }
   return { tone: "warn", label: "GP-5 needs A1: convert", reason: "The GP-5 loads NAM A1 standard only. This A2 capture needs an A1 version first." };
 }

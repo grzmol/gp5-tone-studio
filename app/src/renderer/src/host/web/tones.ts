@@ -20,6 +20,7 @@ export const webTones: TonesApi = {
   image: async () => null,
   downloadModel: desktopOnly("Downloading from TONE3000"),
   prepareForSuite: desktopOnly("Preparing files for Valeton Suite"),
+  prepareSnapTone: desktopOnly("Downloading from TONE3000"),
   prepareLocalIr: desktopOnly("Preparing files for Valeton Suite"),
   setPending: desktopOnly("Linking slots to TONE3000 tones"),
   link: desktopOnly("Linking slots to TONE3000 tones"),

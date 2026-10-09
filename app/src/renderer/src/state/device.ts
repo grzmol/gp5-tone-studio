@@ -655,6 +655,29 @@ export const useDevice = create<DeviceState>((set, get) => {
       return list;
     },
 
+    async uploadSnapTone(slot, name, file, opts) {
+      const s = requireSession();
+      requireIdle();
+      const label = `Writing SnapTone slot ${slot}`;
+      set({ busy: { kind: "snaptone", progress: 0, label } });
+      try {
+        const result = await s.uploadSnapTone(slot, name, file, {
+          confirm: true,
+          onProgress: (done: number, total: number) => {
+            set({ busy: { kind: "snaptone", progress: done / total, label } });
+            opts?.onProgress?.(done / total);
+          },
+        });
+        await get().readSnapTones();
+        return result.name;
+      } catch (e) {
+        noteError(e);
+        throw e;
+      } finally {
+        set({ busy: null });
+      }
+    },
+
     async readUserIRs() {
       const s = requireSession();
       const list: SlotName[] = (await s.readUserIRs()).map((x) => ({ slot: x.index, name: x.name, kind: x.kind }));

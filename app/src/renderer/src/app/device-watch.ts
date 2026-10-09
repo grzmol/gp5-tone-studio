@@ -28,7 +28,7 @@ export function useDeviceWatch(): void {
         lostAt = null;
         notifySuccess("The GP-5 is back", "Reconnected over USB.", { label: "Open Rig", run: () => useNav.getState().go("rig") });
       }
-      const progress = s.busy && (s.busy.kind === "backup" || s.busy.kind === "write" || s.busy.kind === "restore") ? s.busy.progress : null;
+      const progress = s.busy && s.busy.kind !== "sync" ? s.busy.progress : null;
       if (progress !== lastProgress && (progress === null || lastProgress === null || Math.abs(progress - lastProgress) >= 0.01)) {
         lastProgress = progress;
         void host.app.setProgress(progress).catch(() => {});

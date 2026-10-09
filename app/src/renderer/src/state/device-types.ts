@@ -171,7 +171,7 @@ export interface DeviceState {
   /** User IR slot names (1-based display), when read */
   userIRs: SlotName[] | null;
   /** A long job (backup/write) is running; screens disable conflicting actions */
-  busy: null | { kind: "backup" | "write" | "restore" | "sync"; progress: number; label: string };
+  busy: null | { kind: "backup" | "write" | "restore" | "sync" | "snaptone"; progress: number; label: string };
 
   // diagnostics (Device screen)
   /** Why the last session ended: the user disconnected, or the port went away */
@@ -225,6 +225,12 @@ export interface DeviceState {
   setGlobal(name: GlobalName, value: number): void;
   readSnapTones(): Promise<SlotName[]>;
   readUserIRs(): Promise<SlotName[]>;
+  /**
+   * Upload a 2696-byte SnapTone file into user SnapTone slot 50..79, then re-read the SnapTone list.
+   * Replaces whatever the slot holds (SnapTones can't be read back): callers MUST confirm with the user first.
+   * Resolves with the name as stored on the pedal.
+   */
+  uploadSnapTone(slot: number, name: string, file: Uint8Array, opts?: WriteOptions): Promise<string>;
   /**
    * Write several presets (a backup) slot by slot, each acknowledged and verified by read-back (3 attempts).
    * Callers MUST confirm with the user first. Throws RestoreError naming done / failed / not started slots.

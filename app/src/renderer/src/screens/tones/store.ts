@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { create } from "zustand";
-import type { AccountState, FlowRequest, SendResult, T3kTone, ToneListKind, ToneRecord } from "@shared/host/tones";
+import type { AccountState, FlowRequest, NamCheck, SendResult, T3kTone, ToneListKind, ToneRecord } from "@shared/host/tones";
 import { HostError } from "@shared/ipc";
 import { changedSlots, firstEmptySlot } from "@shared/tone3000";
 import { host } from "@/host";
@@ -9,6 +9,7 @@ import { useNav } from "@/state/nav";
 import { notifySuccess } from "@/app/notify";
 import type { DeviceMode, SlotName } from "@/state/device-types";
 import type { PresetRef } from "./usage";
+import { convertToSnapTone } from "@/snaptone/convert";
 
 export interface ListState {
   tones: T3kTone[];
@@ -21,7 +22,8 @@ export interface ListState {
   loaded: boolean;
 }
 
-export type SendPhase = "idle" | "running" | "ready" | "suite" | "linking" | "linked" | "error";
+/** "converting" and "writing" are SnapTone-only; "suite" and "linking" are the IR hand-off to Valeton Suite. */
+export type SendPhase = "idle" | "running" | "converting" | "ready" | "writing" | "suite" | "linking" | "linked" | "error";
 
 export interface SendState {
   toneId: number;
@@ -29,12 +31,20 @@ export interface SendState {
   name: string;
   kind: "snaptone" | "ir";
   phase: SendPhase;
-  /** 1 download, 2 check, 3 save, 4 Suite, 5 link */
+  /** SnapTone: 1 download, 2 check, 3 convert, 4 write, 5 linked. IR: 1 download, 2 check, 3 save, 4 Suite, 5 link */
   step: 1 | 2 | 3 | 4 | 5;
   received: number;
   total: number | null;
+  /** Fraction of the SnapTone conversion or write */
+  progress: number;
   error: string | null;
+  /** IR hand-off file */
   result: SendResult | null;
+  /** SnapTone: the checked NAM file */
+  check: NamCheck | null;
+  /** SnapTone: the converted 2696-byte file, kept for retrying the write */
+  file: Uint8Array | null;
+  /** Target slot: SnapTone 50–79 (chosen by the user), IR the free slot Suite should use */
   proposedSlot: number | null;
   /** Suite launch could be watched (process exit is reported) */
   watched: boolean;
@@ -298,7 +308,7 @@ export async function loadUsage(): Promise<void> {
 
 /**
  * Create (or replace an idle/finished) send draft. `opts.text` is an edited .nam from the capture editor:
- * the hand-off file is made from it instead of the TONE3000 download.
+ * it is sent instead of the TONE3000 download.
  */
 export function startSendDraft(toneId: number, modelId: number, name: string, kind: "snaptone" | "ir", opts: { text?: string } = {}): void {
   const cur = get().send[toneId];
@@ -316,8 +326,11 @@ export function startSendDraft(toneId: number, modelId: number, name: string, ki
         step: 1,
         received: 0,
         total: null,
+        progress: 0,
         error: null,
         result: null,
+        check: null,
+        file: null,
         proposedSlot: firstEmptySlot(kind, kind === "snaptone" ? d.snapTones : d.userIRs),
         watched: false,
         linkedSlot: null,
@@ -327,13 +340,17 @@ export function startSendDraft(toneId: number, modelId: number, name: string, ki
   }));
 }
 
-export function updateDraft(toneId: number, patch: Partial<Pick<SendState, "modelId" | "name">>): void {
+export function updateDraft(toneId: number, patch: Partial<Pick<SendState, "modelId" | "name" | "proposedSlot">>): void {
   patchSend(toneId, patch);
 }
+
+/** Running SnapTone conversions, so cancelSend can stop the worker. */
+const conversions = new Map<number, AbortController>();
 
 export function cancelSend(toneId: number): void {
   const s = get().send[toneId];
   if (s?.result) void host.tones.setPending(toneId, null).then(storeRecord).catch(() => {});
+  conversions.get(toneId)?.abort();
   set((st) => {
     const next = { ...st.send };
     delete next[toneId];
@@ -341,18 +358,61 @@ export function cancelSend(toneId: number): void {
   });
 }
 
-/** Steps 1–3 in main: download, check (+ reshape), save to the hand-off folder. */
+function sendError(toneId: number, e: unknown): void {
+  if (onUnauthorized(e)) patchSend(toneId, { phase: "error", error: "Your TONE3000 sign-in expired. Sign in again, then retry." });
+  else patchSend(toneId, { phase: "error", error: message(e) });
+}
+
+/**
+ * SnapTone: download and check in main, convert in a worker, then write the slot when the pedal is connected
+ * and a slot is chosen (otherwise it waits in "ready"). IR: download, check, save to the Suite hand-off folder.
+ */
 export async function runSend(toneId: number): Promise<void> {
   const s = get().send[toneId];
   if (!s) return;
-  patchSend(toneId, { phase: "running", step: 1, error: null, received: 0, total: null });
+  patchSend(toneId, { phase: "running", step: 1, error: null, received: 0, total: null, progress: 0 });
+  const req = { toneId, modelId: s.modelId, name: s.name, text: s.text ?? undefined };
+  if (s.kind === "ir") {
+    try {
+      const result = await host.tones.prepareForSuite(req);
+      storeRecord(result.record);
+      patchSend(toneId, { phase: "ready", step: 4, result });
+    } catch (e) {
+      sendError(toneId, e);
+    }
+    return;
+  }
+  const abort = new AbortController();
+  conversions.set(toneId, abort);
   try {
-    const result = await host.tones.prepareForSuite({ toneId, modelId: s.modelId, name: s.name, text: s.text ?? undefined });
-    storeRecord(result.record);
-    patchSend(toneId, { phase: "ready", step: 4, result });
+    const source = await host.tones.prepareSnapTone(req);
+    storeRecord(source.record);
+    patchSend(toneId, { phase: "converting", step: 3, check: source.check, progress: 0 });
+    const file = await convertToSnapTone(source.text, (progress) => patchSend(toneId, { progress }), abort.signal);
+    patchSend(toneId, { phase: "ready", step: 4, file, progress: 0 });
   } catch (e) {
-    if (onUnauthorized(e)) patchSend(toneId, { phase: "error", error: "Your TONE3000 sign-in expired. Sign in again, then retry." });
-    else patchSend(toneId, { phase: "error", error: message(e) });
+    if (!abort.signal.aborted) sendError(toneId, e);
+    return;
+  } finally {
+    conversions.delete(toneId);
+  }
+  if (useDevice.getState().status === "connected" && get().send[toneId]?.proposedSlot != null) await writeSnapTone(toneId);
+}
+
+/** SnapTone step 4: write the converted file to the chosen slot, then link the slot to the tone. */
+export async function writeSnapTone(toneId: number): Promise<void> {
+  const s = get().send[toneId];
+  if (!s?.file || s.proposedSlot === null) return;
+  const slot = s.proposedSlot;
+  patchSend(toneId, { phase: "writing", step: 4, error: null, progress: 0 });
+  try {
+    const stored = await useDevice.getState().uploadSnapTone(slot, s.name, s.file, { onProgress: (progress) => patchSend(toneId, { progress }) });
+    const rec = await host.tones.link(toneId, { kind: "snaptone", slot, slotName: stored });
+    storeRecord(rec);
+    patchSend(toneId, { phase: "linked", step: 5, linkedSlot: slot });
+    notifySuccess(`Wrote SnapTone slot ${slot} on your GP-5`, rec.title);
+  } catch (e) {
+    patchSend(toneId, { phase: "error", error: message(e) });
   }
 }
 

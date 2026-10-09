@@ -15,6 +15,7 @@ export const tonesApi: TonesApi = {
   image: (url) => invoke("tones:image", url),
   downloadModel: (toneId, modelId) => invoke("tones:downloadModel", toneId, modelId),
   prepareForSuite: (req) => invoke("tones:prepareForSuite", req),
+  prepareSnapTone: (req) => invoke("tones:prepareSnapTone", req),
   prepareLocalIr: (req) => invoke("tones:prepareLocalIr", req),
   setPending: (toneId, pending) => invoke("tones:setPending", toneId, pending),
   link: (toneId, link) => invoke("tones:link", toneId, link),

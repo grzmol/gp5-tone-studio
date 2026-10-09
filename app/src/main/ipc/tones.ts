@@ -5,7 +5,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { HostError } from "@shared/ipc";
-import type { AccountState, FlowRequest, FlowResult, LocalIrRequest, SendRequest, T3kModel, T3kTone, T3kUser, TonePage, ToneRecord, TonesEvent, ToneListKind, ViewBounds } from "@shared/host/tones";
+import type { AccountState, FlowRequest, FlowResult, LocalIrRequest, SendRequest, SnapToneSource, T3kModel, T3kTone, T3kUser, TonePage, ToneRecord, TonesEvent, ToneListKind, ViewBounds } from "@shared/host/tones";
 import { sanitizeSlotName } from "@shared/tone3000";
 import { assertWav, NamCheckError, prepareNam } from "@shared/nam";
 import { handle } from "./handle";
@@ -177,7 +177,16 @@ function emit(getWindow: () => BrowserWindow | null, event: TonesEvent): void {
   getWindow()?.webContents.send("tones:event", event);
 }
 
-async function downloadModel(getWindow: () => BrowserWindow | null, toneId: number, modelId: number) {
+interface DownloadedModel {
+  path: string;
+  bytes: number;
+  record: ToneRecord;
+  tone: T3kTone;
+  model: T3kModel;
+  models: T3kModel[];
+}
+
+async function downloadModel(getWindow: () => BrowserWindow | null, toneId: number, modelId: number): Promise<DownloadedModel> {
   const [tone, models] = await Promise.all([client.tone(toneId), client.models(toneId)]);
   const model = models.find((m) => m.id === modelId);
   if (!model) throw new HostError("not-found", "This model isn't in the tone anymore");
@@ -193,37 +202,46 @@ async function downloadModel(getWindow: () => BrowserWindow | null, toneId: numb
   return { path, bytes, record, tone, model, models };
 }
 
-async function prepareForSuite(getWindow: () => BrowserWindow | null, req: SendRequest) {
-  const name = sanitizeSlotName(req.name);
-  if (!name) throw new HostError("invalid", "Give the capture a name (letters and digits, up to 10 characters)");
+/** Send steps 1–2: download the model, then check it (WAV) or check and reshape it to NAM 0.5.x. */
+async function downloadAndCheck(getWindow: () => BrowserWindow | null, req: SendRequest) {
   const dl = await downloadModel(getWindow, req.toneId, req.modelId);
-  const progress = (step: "check" | "save") => emit(getWindow, { type: "progress", toneId: req.toneId, modelId: req.modelId, step, received: 0, total: null });
-  progress("check");
+  emit(getWindow, { type: "progress", toneId: req.toneId, modelId: req.modelId, step: "check", received: 0, total: null });
   const buf = await readFile(dl.path);
   const isIr = dl.tone.format === "ir";
-  let out: Buffer | string = buf;
-  let check: { version: string; reshaped: boolean } | null = null;
   try {
-    if (isIr) assertWav(buf);
-    else {
-      const prepared = prepareNam(req.text ?? buf.toString("utf8"));
-      out = prepared.json;
-      check = prepared.check;
+    if (isIr) {
+      assertWav(buf);
+      return { dl, isIr, out: buf as Buffer | string, check: null };
     }
+    const prepared = prepareNam(req.text ?? buf.toString("utf8"));
+    return { dl, isIr, out: prepared.json as Buffer | string, check: prepared.check };
   } catch (e) {
     throw new HostError("invalid", e instanceof NamCheckError || e instanceof Error ? e.message : String(e));
   }
-  progress("save");
+}
+
+async function recordSent(dl: DownloadedModel, reshaped: boolean | undefined): Promise<ToneRecord> {
+  const prev = await readRecord(tonesDir(), dl.tone.id);
+  return writeRecord(tonesDir(), buildRecord(prev, dl.tone, dl.models, { model: dl.model, file: basename(dl.path), bytes: dl.bytes, reshaped }, new Date()));
+}
+
+async function prepareForSuite(getWindow: () => BrowserWindow | null, req: SendRequest) {
+  const name = sanitizeSlotName(req.name);
+  if (!name) throw new HostError("invalid", "Give the capture a name (letters and digits, up to 10 characters)");
+  const { dl, isIr, out, check } = await downloadAndCheck(getWindow, req);
+  emit(getWindow, { type: "progress", toneId: req.toneId, modelId: req.modelId, step: "save", received: 0, total: null });
   const fileName = `${name}.${isIr ? "wav" : "nam"}`;
   await mkdir(handoffDir(), { recursive: true });
   const path = join(handoffDir(), fileName);
   await writeFile(path, out);
-  const prev = await readRecord(tonesDir(), req.toneId);
-  const record = await writeRecord(
-    tonesDir(),
-    buildRecord(prev, dl.tone, dl.models, { model: dl.model, file: basename(dl.path), bytes: dl.bytes, reshaped: check?.reshaped }, new Date()),
-  );
+  const record = await recordSent(dl, check?.reshaped);
   return { path, fileName, bytes: dl.bytes, check, record };
+}
+
+async function prepareSnapTone(getWindow: () => BrowserWindow | null, req: SendRequest): Promise<SnapToneSource> {
+  const { dl, isIr, out, check } = await downloadAndCheck(getWindow, req);
+  if (isIr || !check) throw new HostError("invalid", "This tone is an impulse response, not a NAM capture");
+  return { text: String(out), bytes: dl.bytes, check, record: await recordSent(dl, check.reshaped) };
 }
 
 async function updateRecord(toneId: number, fn: (r: ToneRecord) => ToneRecord): Promise<ToneRecord> {
@@ -284,6 +302,7 @@ export function registerTonesIpc(getWindow: () => BrowserWindow | null): void {
     return { path, bytes, record };
   });
   handle("tones:prepareForSuite", (_e, req: SendRequest) => prepareForSuite(getWindow, req));
+  handle("tones:prepareSnapTone", (_e, req: SendRequest) => prepareSnapTone(getWindow, req));
   handle("tones:prepareLocalIr", async (_e, req: LocalIrRequest) => {
     const name = sanitizeSlotName(req.name);
     if (!name) throw new HostError("invalid", "Give the IR a name (letters and digits, up to 10 characters)");

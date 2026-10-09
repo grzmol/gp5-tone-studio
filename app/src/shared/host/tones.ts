@@ -137,6 +137,16 @@ export interface SendResult {
   record: ToneRecord;
 }
 
+/** A checked NAM A1 model ready for the in-app SnapTone converter. */
+export interface SnapToneSource {
+  /** The model in the 0.5.x JSON layout */
+  text: string;
+  /** Bytes downloaded from TONE3000 */
+  bytes: number;
+  check: NamCheck;
+  record: ToneRecord;
+}
+
 export type SendStep = "download" | "check" | "save";
 
 export type TonesEvent =
@@ -193,6 +203,8 @@ export interface TonesApi {
   downloadModel(toneId: number, modelId: number): Promise<{ path: string; bytes: number; record: ToneRecord }>;
   /** Send steps 1–3: download, check (+ reshape 0.7 → 0.5.x), save to the hand-off folder. */
   prepareForSuite(req: SendRequest): Promise<SendResult>;
+  /** SnapTone send steps 1–2: download and check (+ reshape); returns the model for the in-app converter. */
+  prepareSnapTone(req: SendRequest): Promise<SnapToneSource>;
   /** A dropped WAV IR: check it and copy it to the hand-off folder (no TONE3000 link). */
   prepareLocalIr(req: LocalIrRequest): Promise<{ path: string; fileName: string }>;
   /** Remember the slot table before Suite opens, for the link step. */

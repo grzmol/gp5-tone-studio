@@ -108,6 +108,4 @@ export interface CaptureApi {
   showFiles(key: CaptureKey): Promise<void>;
   /** Save a `.nam` export. Electron: Save dialog (null when cancelled). Browser: download. */
   exportFile(suggestedName: string, text: string): Promise<string | null>;
-  /** Write a file for Valeton Suite into the hand-off folder; returns its path. Desktop only. */
-  saveForSuite(fileName: string, text: string): Promise<string>;
 }

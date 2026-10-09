@@ -1,16 +1,21 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { ArrowRight, Check, ExternalLink, FolderOpen, RotateCcw, Save, Send, TriangleAlert } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ArrowRight, Check, RotateCcw, Send, TriangleAlert } from "lucide-react";
 import type { T3kModel } from "@shared/host/tones";
 import { prepareNam } from "@shared/nam";
-import { isGp5Model, proposeSlotName, sanitizeSlotName } from "@shared/tone3000";
+import { firstEmptySlot, isEmptySlotName, isGp5Model, proposeSlotName, sanitizeSlotName } from "@shared/tone3000";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
+import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
 import { Capture } from "@/components/gear";
-import { host, isElectron } from "@/host";
-import { notifyError, notifySuccess } from "@/app/notify";
+import { host } from "@/host";
+import { notifySuccess } from "@/app/notify";
 import { cn } from "@/lib/utils";
+import { convertToSnapTone } from "@/snaptone/convert";
+import { useDevice } from "@/state/device";
 import { useNav } from "@/state/nav";
+import { UseOnGp5 } from "@/screens/tones/SendSteps";
+import { SnapToneSlotPicker } from "@/screens/tones/SnapToneSteps";
 import { openSheet, startSendDraft, useTones } from "@/screens/tones/store";
 import { isFlat } from "./nam/shaping";
 import { exportText, useCapture } from "./store";
@@ -112,7 +117,7 @@ export function Pipeline() {
         <h2 className="m-0 mb-1.5 text-[24px] leading-[1.1] font-bold tracking-[-0.01em]">Make it GP-5 ready</h2>
         <p className="m-0 text-[12px] text-pretty text-silkscreen-3">
           {info.arch.kind === "A1" && !blocked
-            ? "The GP-5 loads NAM A1 standard only, and this capture is one. Valeton Suite turns it into a SnapTone."
+            ? "The GP-5 loads NAM A1 standard only, and this capture is one. Tone Studio turns it into a SnapTone and writes it to the pedal."
             : "The GP-5 loads NAM A1 standard only. An A2 capture needs an A1 learned from it first."}
         </p>
       </div>
@@ -198,7 +203,7 @@ function A2Pipeline({ title, image, versionLabel, shaped }: { title: string; ima
         <Stop name={title} title="A2-Full" sub={versionLabel} lit caption="NAM A2" image={image} />
         <Hop top="distilled" bottom="not run" />
         <Stop name="A1" title="A1 standard" sub="Not made" lit={false} caption="NAM A1" />
-        <Hop top="Valeton" bottom="converts" />
+        <Hop top="Tone Studio" bottom="converts" />
         <Stop name="SnapTone" title="SnapTone" sub="Can't be measured here" lit={false} />
       </div>
       <ol className="m-0 min-h-0 flex-1 list-none overflow-auto px-5 pt-3 pb-3">
@@ -212,11 +217,11 @@ function A2Pipeline({ title, image, versionLabel, shaped }: { title: string; ima
         <Step n={3} status="pending" title="Check how close it is">
           <Sub>ESR and null test against the A2 on clips it hasn't heard.</Sub>
         </Step>
-        <Step n={4} status="pending" title="Save for Valeton Suite">
-          <Sub>NAM 0.5.x file, checked before it's saved.</Sub>
+        <Step n={4} status="pending" title="Make the SnapTone">
+          <Sub>Tone Studio converts the A1 the way Valeton Suite does.</Sub>
         </Step>
-        <Step n={5} status="pending" title="Import in Suite, then link the slot">
-          <Sub>When Suite closes, Tone Studio finds the new SnapTone and links it to this tone.</Sub>
+        <Step n={5} status="pending" title="Write it to the GP-5 and link the slot">
+          <Sub>Written to a user SnapTone slot over USB and linked to this tone.</Sub>
         </Step>
       </ol>
     </>
@@ -228,10 +233,6 @@ function A1Pipeline({ title, image, shaped, exportFile }: { title: string; image
   const record = useToneRecord();
   const go = useNav((s) => s.go);
   const toneId = loaded.source.kind === "tone" ? Number(loaded.source.ref) : null;
-  const [name, setName] = useState(() => proposeSlotName(title));
-  const [saved, setSaved] = useState<{ path: string; fileName: string } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const linked = record?.gp5.snaptoneSlot ?? null;
 
   const sendViaTones = () => {
@@ -241,42 +242,11 @@ function A1Pipeline({ title, image, shaped, exportFile }: { title: string; image
     go("tones", String(toneId));
   };
 
-  const save = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const { json } = prepareNam(exportFile());
-      const fileName = `${sanitizeSlotName(name) || "CAPTURE"}.nam`;
-      const path = await host.capture.saveForSuite(fileName, json);
-      setSaved({ path, fileName });
-      notifySuccess(`Saved ${fileName}`, "NAM 0.5.x, checked. Import it in Valeton Suite.");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const openSuite = async () => {
-    try {
-      const settings = await host.app.getSettings();
-      if (!settings.valetonSuitePath) {
-        const path = await host.tones.pickSuite();
-        if (!path) return;
-        await host.app.setSettings({ valetonSuitePath: path });
-      }
-      await host.tones.openSuite();
-    } catch (e) {
-      notifyError("Couldn't open Valeton Suite", e);
-    }
-  };
-
-  const linux = host.platform === "linux";
   return (
     <>
       <div className="mx-5 grid grid-cols-[1fr_auto_1fr] items-start gap-1 rounded-lg bg-well px-1.5 py-2.5" aria-label="Chain of approximations">
         <Stop name={title} title="A1 standard" sub="This capture" lit caption="NAM A1" image={image} />
-        <Hop top="Valeton" bottom="converts" />
+        <Hop top="Tone Studio" bottom="converts" />
         <Stop name={linked !== null ? `Slot ${linked}` : "SnapTone"} title="SnapTone" sub={linked !== null ? `Slot ${linked}` : "Can't be measured here"} lit={linked !== null} />
       </div>
       <ol className="m-0 min-h-0 flex-1 list-none overflow-auto px-5 pt-3 pb-3">
@@ -285,67 +255,106 @@ function A1Pipeline({ title, image, shaped, exportFile }: { title: string; image
         </Step>
         {toneId !== null ? (
           <Step n={2} status={linked !== null ? "done" : "current"} title={linked !== null ? `Linked to slot ${linked} on your GP-5` : "Send to the GP-5"}>
-            <Sub>Tone Studio saves your version for Valeton Suite, you import it there, and the new SnapTone links back to this tone.</Sub>
+            <Sub>Tone Studio turns your version into a SnapTone, writes it to a user slot over USB and links the slot to this tone.</Sub>
             <Button variant={linked !== null ? "outline" : "default"} size="sm" className="mt-2 self-start" onClick={sendViaTones}>
               <Send className="size-3.5" aria-hidden />
               {linked !== null ? "Send again" : "Send to GP-5…"}
             </Button>
           </Step>
         ) : (
-          <>
-            <Step n={2} status={saved ? "done" : "current"} title={saved ? `Saved ${saved.fileName}` : "Save for Valeton Suite"}>
-              <Sub>NAM 0.5.x file, checked before it's saved. GP-5 names hold 10 characters.</Sub>
-              {!saved && (
-                <div className="mt-2 flex items-center gap-2">
-                  <InputGroup className="min-w-0 flex-1">
-                    <InputGroupInput
-                      aria-label="Name on the GP-5"
-                      value={name}
-                      maxLength={10}
-                      onChange={(e) => setName(sanitizeSlotName(e.target.value.toUpperCase()))}
-                      className="font-semibold tracking-[0.04em]"
-                    />
-                    <InputGroupAddon align="inline-end">
-                      <InputGroupText className="tabular-nums">{name.length}/10</InputGroupText>
-                    </InputGroupAddon>
-                  </InputGroup>
-                  <Button variant="default" size="sm" disabled={!isElectron || busy || !name} onClick={save}>
-                    {busy ? <Spinner className="size-3.5" /> : <Save className="size-3.5" aria-hidden />}
-                    Save
-                  </Button>
-                </div>
-              )}
-              {!isElectron && <Sub>Saving for Valeton Suite needs the desktop app.</Sub>}
-              {error && (
-                <span className="text-led-fault" role="alert">
-                  {error}
-                </span>
-              )}
-            </Step>
-            <Step n={3} status={saved ? "current" : "pending"} title="Import in Valeton Suite">
-              {linux ? (
-                <Sub>Valeton Suite runs on Windows and macOS. Copy {saved?.fileName ?? "the file"} to a computer with Suite and import it into a user SnapTone slot.</Sub>
-              ) : (
-                <Sub>Import {saved?.fileName ?? "the file"} into a free user SnapTone slot (50–79). Files opened from disk aren't TONE3000 tones, so there's nothing to link back.</Sub>
-              )}
-              {saved && (
-                <span className="mt-2 flex items-center gap-2">
-                  {!linux && (
-                    <Button variant="default" size="sm" onClick={openSuite}>
-                      <ExternalLink className="size-3.5" aria-hidden />
-                      Open Valeton Suite
-                    </Button>
-                  )}
-                  <Button variant="ghost" size="sm" onClick={() => host.app.showItemInFolder(saved.path).catch((e) => notifyError("Couldn't show the file", e))}>
-                    <FolderOpen className="size-3.5" aria-hidden />
-                    Show file
-                  </Button>
-                </span>
-              )}
-            </Step>
-          </>
+          <LocalSend title={title} exportFile={exportFile} />
         )}
       </ol>
+    </>
+  );
+}
+
+type LocalPhase = "idle" | "converting" | "writing";
+
+/** A file opened from disk: convert it and write a user SnapTone slot directly (no TONE3000 tone to link). */
+function LocalSend({ title, exportFile }: { title: string; exportFile: () => string }) {
+  const connected = useDevice((s) => s.status === "connected");
+  const snapTones = useDevice((s) => s.snapTones);
+  const deviceBusy = useDevice((s) => s.busy);
+  const [name, setName] = useState(() => proposeSlotName(title));
+  const [slot, setSlot] = useState<number | null>(null);
+  const [phase, setPhase] = useState<LocalPhase>("idle");
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [written, setWritten] = useState<{ slot: number; name: string } | null>(null);
+  const abort = useRef<AbortController | null>(null);
+
+  useEffect(() => () => abort.current?.abort(), []);
+  useEffect(() => {
+    if (connected && !snapTones && !deviceBusy) void useDevice.getState().readSnapTones().catch(() => {});
+  }, [connected, snapTones, deviceBusy]);
+  useEffect(() => {
+    if (slot === null && snapTones) setSlot(firstEmptySlot("snaptone", snapTones));
+  }, [slot, snapTones]);
+
+  const occupant = slot === null ? null : snapTones?.find((s) => s.slot === slot)?.name;
+  const replacing = occupant && !isEmptySlotName(occupant) ? occupant : null;
+
+  const send = async () => {
+    if (slot === null) return;
+    abort.current = new AbortController();
+    setError(null);
+    setWritten(null);
+    setProgress(0);
+    setPhase("converting");
+    try {
+      const file = await convertToSnapTone(prepareNam(exportFile()).json, setProgress, abort.current.signal);
+      setPhase("writing");
+      setProgress(0);
+      const stored = await useDevice.getState().uploadSnapTone(slot, name, file, { onProgress: setProgress });
+      setWritten({ slot, name: stored });
+      notifySuccess(`Wrote SnapTone slot ${slot} on your GP-5`, `The pedal calls it ${stored}.`);
+    } catch (e) {
+      if (!abort.current.signal.aborted) setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPhase("idle");
+    }
+  };
+
+  const working = phase !== "idle";
+  return (
+    <>
+      <Step n={2} status={written ? "done" : error ? "fault" : "current"} title={written ? `Wrote slot ${written.slot} as ${written.name}` : "Write it to the GP-5"}>
+        <Sub>Tone Studio turns it into a SnapTone (about 10 seconds) and writes a user slot over USB. GP-5 names hold 10 characters.</Sub>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <InputGroup className="w-36">
+            <InputGroupInput
+              aria-label="Name on the GP-5"
+              value={name}
+              maxLength={10}
+              disabled={working}
+              onChange={(e) => setName(sanitizeSlotName(e.target.value.toUpperCase()))}
+              className="font-semibold tracking-[0.04em]"
+            />
+            <InputGroupAddon align="inline-end">
+              <InputGroupText className="tabular-nums">{name.length}/10</InputGroupText>
+            </InputGroupAddon>
+          </InputGroup>
+          <SnapToneSlotPicker value={slot} onChange={setSlot} disabled={working} />
+        </div>
+        {replacing && !working && <Sub>Replaces {replacing}. A SnapTone can't be read back from the pedal.</Sub>}
+        {working && <Progress value={progress * 100} className="mt-2 w-56" aria-label={phase === "converting" ? "SnapTone conversion progress" : "SnapTone write progress"} />}
+        {working && <Sub>{phase === "converting" ? "Making the SnapTone…" : `Writing slot ${slot}…`}</Sub>}
+        <Button variant="default" size="sm" className="mt-2 self-start" disabled={!connected || slot === null || !name || working || Boolean(deviceBusy)} onClick={() => void send()}>
+          {working ? <Spinner className="size-3.5" /> : <Send className="size-3.5" aria-hidden />}
+          {replacing ? `Replace ${replacing} in slot ${slot}` : slot !== null ? `Write to slot ${slot}` : "Write to the GP-5"}
+        </Button>
+        {!connected && <Sub>Connect the GP-5 to write it.</Sub>}
+        {error && (
+          <span className="text-led-fault" role="alert">
+            {error}
+          </span>
+        )}
+      </Step>
+      <Step n={3} status={written ? "done" : "pending"} title="Use it in a preset">
+        <Sub>Files opened from disk aren't TONE3000 tones, so there's nothing to link back. Pick the slot in a preset's NS block.</Sub>
+        {written && <UseOnGp5 isIr={false} slot={written.slot} />}
+      </Step>
     </>
   );
 }

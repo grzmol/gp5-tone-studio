@@ -12,12 +12,12 @@ import { useDevice } from "@/state/device";
 import { notifyError } from "@/app/notify";
 import { finishSuite, openSuite, runSend, updateDraft, type SendState } from "./store";
 
-const kb = (n: number) => (n >= 1_048_576 ? `${(n / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+export const kb = (n: number) => (n >= 1_048_576 ? `${(n / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 const dirOf = (path: string) => path.replace(/[\\/][^\\/]*$/, "");
 
-type StepStatus = "done" | "current" | "pending" | "fault";
+export type StepStatus = "done" | "current" | "pending" | "fault";
 
-function Step({ n, status, title, children }: { n: number; status: StepStatus; title: string; children?: React.ReactNode }) {
+export function Step({ n, status, title, children }: { n: number; status: StepStatus; title: string; children?: React.ReactNode }) {
   return (
     <li
       data-step-status={status}
@@ -47,10 +47,10 @@ function Step({ n, status, title, children }: { n: number; status: StepStatus; t
 }
 
 /**
- * Send to GP-5 (tones.md "The Send to GP-5 flow"): download, check/update, save to the hand-off folder,
- * import in Valeton Suite, link. Tone Studio never writes the slot; Suite does.
+ * Send an IR to the GP-5 (tones.md "The Send to GP-5 flow"): download, check, save to the hand-off folder,
+ * import in Valeton Suite, link. IR upload isn't known yet, so Suite writes the slot. SnapTones: SnapToneSteps.
  */
-export function SendSteps({ send, model, isIr }: { send: SendState; model: T3kModel | undefined; isIr: boolean }) {
+export function SendSteps({ send, model }: { send: SendState; model: T3kModel | undefined }) {
   const { phase, step, error, result } = send;
   const [suitePath, setSuitePath] = useState<string | null | undefined>(undefined);
   const [opening, setOpening] = useState(false);
@@ -61,8 +61,8 @@ export function SendSteps({ send, model, isIr }: { send: SendState; model: T3kMo
     listRef.current?.querySelector('[data-step-status="current"], [data-step-status="fault"]')?.scrollIntoView({ block: "nearest" });
   }, [phase, step]);
   const deviceStatus = useDevice((s) => s.status);
-  const slotWord = isIr ? "User IR slot" : "user slot";
-  const fileWord = result?.fileName ?? `${send.name || "…"}.${isIr ? "wav" : "nam"}`;
+  const slotWord = "User IR slot";
+  const fileWord = result?.fileName ?? `${send.name || "…"}.wav`;
 
   useEffect(() => {
     host.app.getSettings().then((s) => setSuitePath(s.valetonSuitePath), () => setSuitePath(null));
@@ -77,7 +77,7 @@ export function SendSteps({ send, model, isIr }: { send: SendState; model: T3kMo
     return "pending";
   };
   const running = phase === "running";
-  const modelLabel = model ? `${model.name}${isIr ? "" : ", A1 standard"}` : "the model";
+  const modelLabel = model ? model.name : "the model";
 
   const chooseSuite = async () => {
     try {
@@ -137,11 +137,9 @@ export function SendSteps({ send, model, isIr }: { send: SendState; model: T3kMo
         )}
       </Step>
 
-      <Step n={2} status={status(2)} title={result ? (result.check?.reshaped ? "Checked and updated the file" : "Checked the file") : "Check the file"}>
-        {result?.check?.reshaped && <span className="text-silkscreen-3">Reshaped from NAM {result.check.version} to 0.5.x, the layout Valeton Suite imports</span>}
-        {result?.check && !result.check.reshaped && <span className="text-silkscreen-3">NAM {result.check.version}, A1 standard. Nothing to change.</span>}
-        {result && !result.check && <span className="text-silkscreen-3">A WAV impulse response</span>}
-        {!result && phase !== "error" && <span className="text-silkscreen-3">{isIr ? "Confirm it's a WAV file" : "Confirm it's NAM A1 standard and update 0.7 files to the 0.5 layout"}</span>}
+      <Step n={2} status={status(2)} title={result ? "Checked the file" : "Check the file"}>
+        {result && <span className="text-silkscreen-3">A WAV impulse response</span>}
+        {!result && phase !== "error" && <span className="text-silkscreen-3">Confirm it's a WAV file</span>}
         {running && step === 2 && <Spinner className="mt-1" />}
         {phase === "error" && step === 2 && <StepError error={error} />}
       </Step>
@@ -201,12 +199,12 @@ export function SendSteps({ send, model, isIr }: { send: SendState; model: T3kMo
       <Step
         n={5}
         status={status(5)}
-        title={phase === "linked" && send.linkedSlot !== null ? `Linked to slot ${send.linkedSlot} on your GP-5` : `Link the new ${isIr ? "IR" : "SnapTone"}`}
+        title={phase === "linked" && send.linkedSlot !== null ? `Linked to slot ${send.linkedSlot} on your GP-5` : "Link the new IR"}
       >
         {phase !== "linked" && (
           <span className="text-pretty text-silkscreen-3">
-            When Suite closes, Tone Studio reads the pedal's {isIr ? "User IR" : "SnapTone"} list and links {send.proposedSlot !== null ? `slot ${send.proposedSlot}` : "the new slot"} to this tone, so the{" "}
-            {isIr ? "CAB" : "NS"} block shows its image.
+            When Suite closes, Tone Studio reads the pedal's User IR list and links {send.proposedSlot !== null ? `slot ${send.proposedSlot}` : "the new slot"} to this tone, so the CAB
+            block shows its image.
           </span>
         )}
         {(phase === "suite" || (linux && phase === "ready")) && (
@@ -216,14 +214,14 @@ export function SendSteps({ send, model, isIr }: { send: SendState; model: T3kMo
             </Button>
           </span>
         )}
-        {phase === "linked" && send.linkedSlot !== null && <UseOnGp5 isIr={isIr} slot={send.linkedSlot} />}
+        {phase === "linked" && send.linkedSlot !== null && <UseOnGp5 isIr slot={send.linkedSlot} />}
       </Step>
 
     </ol>
   );
 }
 
-function StepError({ error }: { error: string | null }) {
+export function StepError({ error }: { error: string | null }) {
   return (
     <span role="alert" className="text-pretty text-led-fault">
       {error ?? "Something went wrong."}

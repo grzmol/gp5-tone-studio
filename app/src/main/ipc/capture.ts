@@ -183,12 +183,4 @@ export function registerCaptureIpc(getWindow: () => BrowserWindow | null): void 
     await writeFile(res.filePath, text, "utf8");
     return res.filePath;
   });
-  handle("capture:saveForSuite", async (_e, fileName: string, text: string) => {
-    assertNamText(text);
-    const dir = join(userData(), "ready-for-suite"); // the hand-off folder Tones lists (tones:handoff)
-    await mkdir(dir, { recursive: true });
-    const path = join(dir, safeNamName(fileName));
-    await writeFile(path, text, "utf8");
-    return path;
-  });
 }

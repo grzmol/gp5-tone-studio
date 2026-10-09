@@ -10,5 +10,4 @@ export const captureApi: CaptureApi = {
   saveDraft: (key, draft) => invoke("capture:saveDraft", key, draft),
   showFiles: (key) => invoke("capture:showFiles", key),
   exportFile: (suggestedName, text) => invoke("capture:exportFile", suggestedName, text),
-  saveForSuite: (fileName, text) => invoke("capture:saveForSuite", fileName, text),
 };
