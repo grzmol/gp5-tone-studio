@@ -685,6 +685,30 @@ export const useDevice = create<DeviceState>((set, get) => {
       return list;
     },
 
+    async uploadUserIr(slot, name, data, opts) {
+      const s = requireSession();
+      requireIdle();
+      // The pedal, Suite and the UI number User IRs from 1 ("User IR 1" = slot 0).
+      const label = `Writing User IR ${slot + 1}`;
+      set({ busy: { kind: "userir", progress: 0, label } });
+      try {
+        const result = await s.uploadUserIr(slot, name, data, {
+          confirm: true,
+          onProgress: (done: number, total: number) => {
+            set({ busy: { kind: "userir", progress: done / total, label } });
+            opts?.onProgress?.(done / total);
+          },
+        });
+        await get().readUserIRs();
+        return result.name;
+      } catch (e) {
+        noteError(e);
+        throw e;
+      } finally {
+        set({ busy: null });
+      }
+    },
+
     async restoreAll(entries, opts) {
       const s = requireSession();
       requireIdle();

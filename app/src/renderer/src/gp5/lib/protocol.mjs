@@ -34,6 +34,7 @@ export const READ = Object.freeze({
 /** Command function codes (payload [0x11, fn, ...]). */
 export const CMD = Object.freeze({
   SET_GLOBAL: 0x11,
+  IMPORT_USER_IR: 0x21, // User IR (cab WAV) upload (lib/userir.mjs)
   IMPORT_SNAPTONE: 0x25, // SnapTone file upload (lib/snaptone.mjs)
   SET_PATCH_SETTING: 0x42,
   SELECT_PRESET: 0x43,
