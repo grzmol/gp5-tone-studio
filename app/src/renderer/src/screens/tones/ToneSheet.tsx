@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, Info, Wand2 } from "lucide-react";
 import type { T3kModel, T3kTone } from "@shared/host/tones";
 import { HostError } from "@shared/ipc";
-import { ARCH_LABEL, gearLabel, isGp5Model, licenseLabel, modelsVerdict, proposeSlotName, verdictLabel } from "@shared/tone3000";
+import { ARCH_LABEL, gearLabel, gp5Models, isGp5Model, licenseLabel, modelsVerdict, proposeSlotName, verdictLabel } from "@shared/tone3000";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -69,7 +69,7 @@ function SheetBody({ toneId, initial }: { toneId: number; initial: T3kTone | nul
   const image = tone?.images?.[0] ?? record?.image_url ?? null;
   const url = tone?.url ?? record?.url ?? null;
   const verdict = models ? modelsVerdict(format, models, record) : null;
-  const sendable = useMemo(() => (isIr ? (models ?? []) : (models ?? []).filter(isGp5Model)), [models, isIr]);
+  const sendable = useMemo(() => (isIr ? (models ?? []) : gp5Models(models ?? [])), [models, isIr]);
 
   // A draft send exists as soon as the models are known, so the model radio and name drive it.
   useEffect(() => {
@@ -155,7 +155,7 @@ function SheetBody({ toneId, initial }: { toneId: number; initial: T3kTone | nul
           <section aria-label="Models" className="flex flex-col gap-2.5">
             <div className="flex items-baseline justify-between gap-3 text-[11px]">
               <h3 className="text-[12px] font-semibold text-silkscreen-2">Models in this tone</h3>
-              <span className="text-silkscreen-3">{isIr ? "WAV impulse responses" : "The GP-5 loads A1 standard only"}</span>
+              <span className="text-silkscreen-3">{isIr ? "WAV impulse responses" : "A1 and A2 become SnapTones"}</span>
             </div>
             {!models ? (
               <div className="flex flex-col gap-2">
@@ -199,8 +199,8 @@ function SheetBody({ toneId, initial }: { toneId: number; initial: T3kTone | nul
             )}
             {!isIr && models && (
               <div className="flex flex-wrap items-center gap-2 text-[12px] text-silkscreen-3">
-                {verdict?.kind === "not-loadable" && <span className="grow">{verdictLabel(verdict)}. The capture editor can make an A1 version.</span>}
-                <Button variant={verdict?.kind === "not-loadable" ? "default" : "ghost"} size="sm" onClick={editCapture}>
+                {verdict?.kind === "not-loadable" && <span className="grow">{verdictLabel(verdict)}.</span>}
+                <Button variant="ghost" size="sm" onClick={editCapture}>
                   <Wand2 data-icon="inline-start" />
                   Edit capture
                 </Button>

@@ -43,7 +43,7 @@ export function SplashDialog() {
           </li>
           <li className="flex gap-2.5">
             <Filter className="size-4 flex-none text-silkscreen-3" aria-hidden />
-            The GP-5 plays NAM A1 standard captures, so the picker asks for those.
+            NAM A1 and A2 captures both work: Tone Studio turns them into GP-5 SnapTones.
           </li>
         </ul>
         <DialogFooter>

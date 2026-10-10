@@ -102,8 +102,12 @@ export type FlowResult =
 export interface NamCheck {
   /** Version found in the downloaded file, e.g. "0.5.4" or "0.7.0" */
   version: string;
-  /** The file was converted from 0.7.x to the 0.5.x layout Valeton Suite imports */
+  /** The A1 file was converted from 0.7.x to the 0.5.x layout (A2 files are never changed) */
   reshaped: boolean;
+  /** NAM architecture family Tone Studio renders the SnapTone from */
+  arch: "A1" | "A2";
+  /** A1: standard, lite, feather or nano; A2: the rendered (last) submodel, standard (8 channels) or nano (3) */
+  size: string;
 }
 
 export interface SendRequest {
@@ -137,9 +141,9 @@ export interface SendResult {
   record: ToneRecord;
 }
 
-/** A checked NAM A1 model ready for the in-app SnapTone converter. */
+/** A checked NAM model (A1 or A2) ready for the in-app SnapTone converter. */
 export interface SnapToneSource {
-  /** The model in the 0.5.x JSON layout */
+  /** The model as shared/nam.ts prepareNam returns it: A1 in the 0.5.x JSON layout, A2 unchanged */
   text: string;
   /** Bytes downloaded from TONE3000 */
   bytes: number;

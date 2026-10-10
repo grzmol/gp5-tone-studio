@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import tinyA2 from "./fixtures/tiny-a2.nam?raw";
 import { inspectNam, NamParseError, NamTransformError, parseNam, serializeNam, withMetadata, withOutputGain, withSize, editableMetadata, type NamFile } from "./model";
+import { verdictOf } from "../Head";
 
 type Sub = { max_value: number; model: { config: { head_scale: number; layers: Record<string, unknown>[] }; weights: number[]; metadata: { loudness: number } } };
 const subs = (f: NamFile) => f.config.submodels as Sub[];
@@ -73,13 +74,22 @@ describe("inspectNam", () => {
   });
 
   it("explains why a capture can't be converted", () => {
-    expect(inspectNam({ ...a1(), sample_rate: 44100 }).unsupported).toBe("This capture is 44.1 kHz. The GP-5 needs 48 kHz captures.");
+    expect(inspectNam({ ...parseNam(tinyA2), sample_rate: 22050 }).unsupported).toMatch(/^This capture can't become a GP-5 SnapTone: .*(22050 Hz|sample rates).*\.$/);
     expect(inspectNam({ ...a1(), architecture: "LSTM" }).unsupported).toBe("This file uses a custom NAM layout we can't read.");
     const film = parseNam(tinyA2);
     subs(film)[1].model.config.layers[0].conv_pre_film = { active: true, shift: true, groups: 1 };
     const info = inspectNam(film);
     expect(info.features).toEqual(["FiLM conditioning"]);
-    expect(info.unsupported).toMatch(/FiLM conditioning/);
+    expect(info.unsupported).toBe("This capture can't become a GP-5 SnapTone: the layer array uses FiLM.");
+  });
+
+  it("accepts an A2 the way Valeton Suite does, and Head calls it ready", () => {
+    const info = inspectNam(parseNam(tinyA2));
+    expect(info.unsupported).toBeNull();
+    expect(verdictOf(info, null)).toMatchObject({ tone: "on", label: "Ready for GP-5" });
+    expect(verdictOf(info, 7)).toMatchObject({ tone: "on", label: "Linked to slot 7 on your GP-5" });
+    const bad = inspectNam({ ...parseNam(tinyA2), sample_rate: 22050 });
+    expect(verdictOf(bad, null)).toMatchObject({ tone: "fault", reason: bad.unsupported });
   });
 
   it("marks the level as not editable when head_scale isn't the last weight", () => {

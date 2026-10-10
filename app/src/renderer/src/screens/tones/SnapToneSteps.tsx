@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { FileAudio, RotateCcw } from "lucide-react";
 import { SIGNAL_IN_SUITE } from "@shared/host/snaptone";
 import type { T3kModel } from "@shared/host/tones";
-import { firstEmptySlot, isEmptySlotName, sanitizeSlotName } from "@shared/tone3000";
+import { ARCH_LABEL, firstEmptySlot, isEmptySlotName, sanitizeSlotName } from "@shared/tone3000";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -55,7 +55,7 @@ export function SnapToneSteps({ send, model }: { send: SendState; model: T3kMode
   const writeLabel = replacing ? `Replace ${replacing} in slot ${slot}` : `Write to ${slotText}`;
   const canEdit = phase === "idle" || phase === "ready" || (phase === "error" && step !== 3);
   const canWrite = connected && slot !== null && !busy;
-  const modelLabel = model ? `${model.name}, A1 standard` : "the model";
+  const modelLabel = model ? `${model.name}, ${ARCH_LABEL(model)}` : "the model";
 
   return (
     <ol ref={listRef} className="flex flex-col">
@@ -99,8 +99,12 @@ export function SnapToneSteps({ send, model }: { send: SendState; model: T3kMode
 
       <Step n={2} status={status(2)} title={send.check ? "Checked the file" : "Check the file"}>
         {send.check?.reshaped && <span className="text-silkscreen-3">Updated from NAM {send.check.version} to the 0.5.x layout</span>}
-        {send.check && !send.check.reshaped && <span className="text-silkscreen-3">NAM {send.check.version}, A1 standard</span>}
-        {!send.check && phase !== "error" && <span className="text-silkscreen-3">Confirm it's NAM A1 standard</span>}
+        {send.check && !send.check.reshaped && (
+          <span className="text-silkscreen-3">
+            NAM {send.check.version}, {send.check.arch === "A2" ? `A2 (${send.check.size === "nano" ? "Lite" : "Full"} size)` : `A1 ${send.check.size}`}
+          </span>
+        )}
+        {!send.check && phase !== "error" && <span className="text-silkscreen-3">Confirm Tone Studio can convert it</span>}
         {phase === "running" && step === 2 && <Spinner className="mt-1" />}
         {phase === "error" && step === 2 && <StepError error={error} />}
       </Step>

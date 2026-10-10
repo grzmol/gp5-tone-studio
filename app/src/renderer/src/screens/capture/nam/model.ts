@@ -2,6 +2,7 @@
 // A2 = `SlimmableContainer` (NAM 0.7.x) holding one WaveNet per size (max_value 0.5 = Lite, 1.0 = Full).
 // A1 = a single `WaveNet` (0.5.x layout: `kernel_size`, `head_size` per layer array).
 import type { CaptureMetadata, CaptureSize } from "@shared/host/capture";
+import { checkNam, NamCheckError } from "@shared/nam";
 
 export type JsonObject = { [key: string]: unknown };
 
@@ -101,7 +102,7 @@ export interface NamInfo {
   gain: number | null;
   inputLevelDbu: number | null;
   outputLevelDbu: number | null;
-  /** A2 options a distiller would have to support (FiLM, gating, grouping) */
+  /** A2 options this file uses (FiLM, gating, grouping), named for people */
   features: string[];
   /** Output level can be changed losslessly (head_scale is the last weight of every WaveNet) */
   levelEditable: boolean;
@@ -136,7 +137,7 @@ function firstChannels(config: JsonObject): number | null {
   return Array.isArray(layers) && isObject(layers[0]) ? num(layers[0].channels) : null;
 }
 
-/** NAM A2 options the A1 trainer can't reproduce, named for people. */
+/** NAM A2 options a file uses, named for people. */
 function a2Features(config: JsonObject): string[] {
   const found = new Set<string>();
   const layers = Array.isArray(config.layers) ? config.layers : [];
@@ -223,10 +224,13 @@ export function inspectNam(file: NamFile): NamInfo {
 
   let unsupported: string | null = null;
   if (arch.kind === "other") unsupported = "This file uses a custom NAM layout we can't read.";
-  else if (sampleRate !== null && sampleRate !== 48000) {
-    unsupported = `This capture is ${formatKhz(sampleRate)}. The GP-5 needs 48 kHz captures.`;
-  } else if (features.length) {
-    unsupported = `This A2 uses features (${features.join(", ")}) the trainer can't turn into an A1 yet.`;
+  else {
+    try {
+      checkNam(file);
+    } catch (e) {
+      if (!(e instanceof NamCheckError)) throw e;
+      unsupported = `This capture can't become a GP-5 SnapTone: ${e.detail}.`;
+    }
   }
 
   return {

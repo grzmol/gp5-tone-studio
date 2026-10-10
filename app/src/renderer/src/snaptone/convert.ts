@@ -16,8 +16,8 @@ export type ConvertReply =
 const PHASE_SPAN: Record<ClonePhase, [number, number]> = { excitation: [0, 0.07], render: [0.07, 0.4], clone: [0.4, 1] };
 
 /**
- * Convert a NAM A1 standard model (0.5.x JSON, see shared/nam.ts prepareNam) into a 2696-byte SnapTone file,
- * in a Web Worker. `onProgress` gets an overall fraction 0..1 (the clone phase reports only its start).
+ * Convert a NAM A1 or A2 model (checked by shared/nam.ts prepareNam) into a 2696-byte SnapTone file, in a Web
+ * Worker. `onProgress` gets an overall fraction 0..1 (the clone phase reports only its start).
  */
 export async function convertToSnapTone(namText: string, onProgress?: (fraction: number) => void, signal?: AbortSignal): Promise<Uint8Array> {
   const signalWav = await host.snaptone.signal();

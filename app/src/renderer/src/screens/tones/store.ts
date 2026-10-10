@@ -213,8 +213,8 @@ export function requestImage(url: string): void {
 
 // ---------------------------------------------------------------------------------- sign-in / Select flow
 
-/** "Browse TONE3000": splash first (once), then the Select flow scoped to what the GP-5 can load. */
-export async function browse(req: FlowRequest = { prompt: "select_tone", architecture: "1" }): Promise<void> {
+/** "Browse TONE3000": splash first (once), then the Select flow (A1 and A2 tones both become SnapTones). */
+export async function browse(req: FlowRequest = { prompt: "select_tone" }): Promise<void> {
   if (!get().account) await loadAccount();
   const account = get().account;
   set({ flow: req });
@@ -230,7 +230,7 @@ export function browseForBlock(kind: "capture" | "ir"): void {
   useNav.getState().go("tones");
   void browse(
     kind === "capture"
-      ? { prompt: "select_tone", format: "nam", architecture: "1", gears: "amp_amp-cab_pedal" }
+      ? { prompt: "select_tone", format: "nam", gears: "amp_amp-cab_pedal" }
       : { prompt: "select_tone", format: "ir", gears: "cab" },
   );
 }
