@@ -148,10 +148,33 @@ Diagnostics check each step of the connection to the pedal, and a live MIDI moni
 
 ## Tones from TONE3000.
 
-Browse and download NAM captures and IRs from TONE3000, and see which slots on your GP-5 already hold them.<br>
-A NAM capture, A1 or A2, becomes a SnapTone right in the app and goes straight to a user slot over USB. IRs go straight to one of the 20 User IR slots. No Valeton Suite needed.<br>
-The capture editor plays your guitar through a capture, using the input of your audio interface.
+Browse and download NAM captures and IRs from TONE3000, and see which slots on your GP-5 already hold them.
 
+<br>
+
+<img src="assets/tones.png" alt="Tones screen with trending TONE3000 captures and the GP-5's SnapTone and User IR slots" width="100%">
+
+<br>
+<br>
+
+A NAM capture, A1 or A2, becomes a SnapTone right in the app and goes straight to a user slot over USB.<br>
+IRs go straight to one of the 20 User IR slots. No Valeton Suite needed.
+
+<br>
+
+<img src="assets/tone-send.png" alt="A TONE3000 capture being made into a SnapTone and sent to slot 58" width="100%">
+
+<br>
+<br>
+
+The capture editor plays your guitar through a capture, using the input of your audio interface.<br>
+Compare its sizes, match levels, and shape it before it goes to the GP-5.
+
+<br>
+
+<img src="assets/capture-editor.png" alt="Capture editor with A/B playback and tone shaping before the capture" width="100%">
+
+<br>
 <br>
 
 </div>
@@ -164,10 +187,33 @@ The capture editor plays your guitar through a capture, using the input of your 
 
 ## From a song to a tone.
 
-Drop a song and split it into drums, bass, guitar, piano, vocals and the rest, on your own computer. Mute or solo any of them and export them as WAV.<br>
-Tone Match listens to the guitar alone and proposes a GP-5 preset you can play on the pedal right away.<br>
+Drop a song and split it into drums, bass, guitar, piano, vocals and the rest, on your own computer.<br>
+Mute or solo any of them and export them as WAV.
+
+<br>
+
+<img src="assets/song-stems.png" alt="A song split into six stems with the guitar soloed" width="100%">
+
+<br>
+<br>
+
+Tone Match listens to the guitar alone and proposes a GP-5 preset you can play on the pedal right away.
+
+<br>
+
+<img src="assets/song-tone-match.png" alt="Tone Match proposing a GP-5 preset, block by block" width="100%">
+
+<br>
+<br>
+
+It shows what it heard: gain, echo, reverb, level, and the guitar's spectrum against a typical guitar.<br>
 Record yourself through the GP-5 and it designs a cabinet IR that brings your tone closer to the song's.
 
+<br>
+
+<img src="assets/song-analysis.png" alt="Tone Match analysis with the guitar stem's spectrum and the IR match" width="100%">
+
+<br>
 <br>
 
 </div>
