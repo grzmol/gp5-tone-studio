@@ -1,14 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowRight, Check, RotateCcw, Send, TriangleAlert } from "lucide-react";
-import type { T3kModel } from "@shared/host/tones";
+import { ArrowRight, Check, Send, TriangleAlert } from "lucide-react";
 import { prepareNam } from "@shared/nam";
-import { firstEmptySlot, isEmptySlotName, isGp5Model, proposeSlotName, sanitizeSlotName } from "@shared/tone3000";
+import { firstEmptySlot, isEmptySlotName, proposeSlotName, sanitizeSlotName } from "@shared/tone3000";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
 import { Capture } from "@/components/gear";
-import { host } from "@/host";
 import { notifySuccess } from "@/app/notify";
 import { cn } from "@/lib/utils";
 import { convertToSnapTone } from "@/snaptone/convert";
@@ -18,6 +16,7 @@ import { useNav } from "@/state/nav";
 import { UseOnGp5 } from "@/screens/tones/SendSteps";
 import { SnapToneSlotPicker, TestSignalNotice } from "@/screens/tones/SnapToneSteps";
 import { openSheet, startSendDraft, useTones } from "@/screens/tones/store";
+import type { NamInfo } from "./nam/model";
 import { isFlat } from "./nam/shaping";
 import { exportText, useCapture } from "./store";
 import { Led, PANEL, useCaptureTitle, useToneRecord } from "./parts";
@@ -73,25 +72,6 @@ function Hop({ top, bottom }: { top: string; bottom: string }) {
   );
 }
 
-/** TONE3000 A1 standard model of this tone, if any (step 1). */
-function useLegacyA1(toneId: number | null) {
-  const [state, setState] = useState<{ status: "idle" | "loading" | "done" | "error"; model: T3kModel | null; error: string | null }>({ status: "idle", model: null, error: null });
-  const [nonce, setNonce] = useState(0);
-  useEffect(() => {
-    if (toneId === null) return;
-    let live = true;
-    setState({ status: "loading", model: null, error: null });
-    host.tones.models(toneId).then(
-      (models) => live && setState({ status: "done", model: models.find(isGp5Model) ?? null, error: null }),
-      (e: Error) => live && setState({ status: "error", model: null, error: e?.message ?? String(e) }),
-    );
-    return () => {
-      live = false;
-    };
-  }, [toneId, nonce]);
-  return { ...state, retry: () => setNonce((n) => n + 1) };
-}
-
 export function Pipeline() {
   const loaded = useCapture((s) => s.loaded)!;
   const recipe = useCapture((s) => s.recipe)!;
@@ -101,8 +81,9 @@ export function Pipeline() {
   const image = useTones((s) => (record?.image_url ? (s.images[record.image_url] ?? undefined) : undefined));
   const { info } = loaded;
   const verdict = verdictOf(info, record?.gp5.snaptoneSlot ?? null);
-  const blocked = info.unsupported !== null || (info.arch.kind === "A1" && info.arch.size !== "standard");
+  const blocked = info.unsupported !== null;
   const versionLabel = base === 0 ? "Original" : `Version ${base}`;
+  const liteOnly = recipe.size === "lite" || (info.arch.kind === "A2" && !info.arch.submodels.some((s) => s.size === "full"));
 
   return (
     <section
@@ -116,11 +97,7 @@ export function Pipeline() {
       <div className="px-5 pt-4 pb-2">
         <p className="m-0 mb-1 text-[12px] text-silkscreen-2">GP-5 version · user SnapTone</p>
         <h2 className="m-0 mb-1.5 text-[24px] leading-[1.1] font-bold tracking-[-0.01em]">Make it GP-5 ready</h2>
-        <p className="m-0 text-[12px] text-pretty text-silkscreen-3">
-          {info.arch.kind === "A1" && !blocked
-            ? "The GP-5 loads NAM A1 standard only, and this capture is one. Tone Studio turns it into a SnapTone and writes it to the pedal."
-            : "The GP-5 loads NAM A1 standard only. An A2 capture needs an A1 learned from it first."}
-        </p>
+        <p className="m-0 text-[12px] text-pretty text-silkscreen-3">Tone Studio turns this capture into a SnapTone the way Valeton Suite does and writes it to the pedal.</p>
       </div>
 
       {blocked ? (
@@ -131,110 +108,41 @@ export function Pipeline() {
             <span className="text-pretty text-silkscreen-2">{verdict.reason}</span>
           </div>
         </div>
-      ) : info.arch.kind === "A2" ? (
-        <A2Pipeline title={title} image={image} versionLabel={versionLabel} shaped={!isFlat(recipe.shaping)} />
       ) : (
-        <A1Pipeline title={title} image={image} shaped={!isFlat(recipe.shaping)} exportFile={() => exportText(loaded, recipe)} />
+        <Gp5Pipeline
+          title={title}
+          image={image}
+          versionLabel={versionLabel}
+          info={info}
+          liteOnly={liteOnly}
+          shaped={!isFlat(recipe.shaping)}
+          exportFile={() => exportText(loaded, recipe)}
+        />
       )}
     </section>
   );
 }
 
-function A2Pipeline({ title, image, versionLabel, shaped }: { title: string; image?: string; versionLabel: string; shaped: boolean }) {
-  const loaded = useCapture((s) => s.loaded)!;
-  const record = useToneRecord();
-  const toneId = loaded.source.kind === "tone" ? Number(loaded.source.ref) : null;
-  const legacy = useLegacyA1(toneId);
-  const go = useNav((s) => s.go);
-
-  const sendLegacy = () => {
-    if (toneId === null || !legacy.model) return;
-    startSendDraft(toneId, legacy.model.id, proposeSlotName(record?.title ?? title, legacy.model.name), "snaptone");
-    openSheet(toneId);
-    go("tones", String(toneId));
-  };
-
-  let step1: ReactNode;
-  let step1Status: StepStatus = "done";
-  if (toneId === null) {
-    step1 = <Step n={1} status="done" title="Not a TONE3000 tone"><Sub>This file was opened from disk, so there's no A1 model to look up.</Sub></Step>;
-  } else if (legacy.status === "loading" || legacy.status === "idle") {
-    step1Status = "current";
-    step1 = (
-      <Step n={1} status="current" title="Looking for an A1 model on TONE3000">
-        <span className="flex items-center gap-2 text-silkscreen-3">
-          <Spinner className="size-3" />
-          Checking this tone's models
-        </span>
-      </Step>
-    );
-  } else if (legacy.status === "error") {
-    step1Status = "fault";
-    step1 = (
-      <Step n={1} status="fault" title="Couldn't check TONE3000">
-        <Sub>{legacy.error}</Sub>
-        <Button variant="ghost" size="sm" className="mt-1 self-start" onClick={legacy.retry}>
-          <RotateCcw className="size-3.5" aria-hidden />
-          Retry
-        </Button>
-      </Step>
-    );
-  } else if (legacy.model) {
-    step1Status = "current";
-    step1 = (
-      <Step n={1} status="current" title="TONE3000 has an A1 model of this tone">
-        <Sub>
-          {shaped
-            ? "TONE3000's A1 doesn't include your shaping. It can still go to the GP-5 as it was captured."
-            : `“${legacy.model.name}” is A1 standard, so it can go to the GP-5 without training.`}
-        </Sub>
-        <Button variant="default" size="sm" className="mt-2 self-start" onClick={sendLegacy}>
-          <Send className="size-3.5" aria-hidden />
-          Send it to the GP-5
-        </Button>
-      </Step>
-    );
-  } else {
-    step1 = <Step n={1} status="done" title="No A1 model on TONE3000"><Sub>This tone is A2 only.</Sub></Step>;
-  }
-
-  return (
-    <>
-      <div className="mx-5 grid grid-cols-[1fr_auto_1fr_auto_1fr] items-start gap-1 rounded-lg bg-well px-1.5 py-2.5" aria-label="Chain of approximations">
-        <Stop name={title} title="A2-Full" sub={versionLabel} lit caption="NAM A2" image={image} />
-        <Hop top="distilled" bottom="not run" />
-        <Stop name="A1" title="A1 standard" sub="Not made" lit={false} caption="NAM A1" />
-        <Hop top="Tone Studio" bottom="converts" />
-        <Stop name="SnapTone" title="SnapTone" sub="Can't be measured here" lit={false} />
-      </div>
-      <ol className="m-0 min-h-0 flex-1 list-none overflow-auto px-5 pt-3 pb-3">
-        {step1}
-        <Step n={2} status={step1Status === "current" && legacy.model ? "pending" : "fault"} title="Learn the A1 from your A2">
-          <Sub>
-            Learning an A1 needs the capture trainer (Python, PyTorch and the NAM trainer, run on this computer). This version of Tone Studio doesn't include it,
-            so this step can't run here.
-          </Sub>
-        </Step>
-        <Step n={3} status="pending" title="Check how close it is">
-          <Sub>ESR and null test against the A2 on clips it hasn't heard.</Sub>
-        </Step>
-        <Step n={4} status="pending" title="Make the SnapTone">
-          <Sub>Tone Studio converts the A1 the way Valeton Suite does.</Sub>
-        </Step>
-        <Step n={5} status="pending" title="Write it to the GP-5 and link the slot">
-          <Sub>Written to a user SnapTone slot over USB and linked to this tone.</Sub>
-        </Step>
-      </ol>
-    </>
-  );
+interface Gp5PipelineProps {
+  title: string;
+  image?: string;
+  versionLabel: string;
+  info: NamInfo;
+  /** The exported A2 keeps only its Lite size, so that is what becomes the SnapTone */
+  liteOnly: boolean;
+  shaped: boolean;
+  exportFile: () => string;
 }
 
-function A1Pipeline({ title, image, shaped, exportFile }: { title: string; image?: string; shaped: boolean; exportFile: () => string }) {
+function Gp5Pipeline({ title, image, versionLabel, info, liteOnly, shaped, exportFile }: Gp5PipelineProps) {
   const loaded = useCapture((s) => s.loaded)!;
   const record = useToneRecord();
   const go = useNav((s) => s.go);
   const toneId = loaded.source.kind === "tone" ? Number(loaded.source.ref) : null;
   const linked = record?.gp5.snaptoneSlot ?? null;
+  const isA2 = info.arch.kind === "A2";
+  const a1Size = info.arch.kind === "A1" ? info.arch.size : "";
+  const stopTitle = isA2 ? (liteOnly ? "A2-Lite" : "A2-Full") : `A1 ${a1Size}`;
 
   const sendViaTones = () => {
     if (toneId === null || loaded.key.modelId === null) return;
@@ -246,12 +154,13 @@ function A1Pipeline({ title, image, shaped, exportFile }: { title: string; image
   return (
     <>
       <div className="mx-5 grid grid-cols-[1fr_auto_1fr] items-start gap-1 rounded-lg bg-well px-1.5 py-2.5" aria-label="Chain of approximations">
-        <Stop name={title} title="A1 standard" sub="This capture" lit caption="NAM A1" image={image} />
+        <Stop name={title} title={stopTitle} sub={versionLabel} lit caption={isA2 ? "NAM A2" : "NAM A1"} image={image} />
         <Hop top="Tone Studio" bottom="converts" />
         <Stop name={linked !== null ? `Slot ${linked}` : "SnapTone"} title="SnapTone" sub={linked !== null ? `Slot ${linked}` : "Can't be measured here"} lit={linked !== null} />
       </div>
       <ol className="m-0 min-h-0 flex-1 list-none overflow-auto px-5 pt-3 pb-3">
-        <Step n={1} status="done" title="Already A1 standard">
+        <Step n={1} status="done" title={isA2 ? `A2: the ${liteOnly ? "Lite" : "Full"} size becomes the SnapTone` : `Already NAM A1 ${a1Size}`}>
+          {isA2 && <Sub>Valeton Suite renders an A2's largest size into a SnapTone, and so does Tone Studio.</Sub>}
           <Sub>{shaped ? "Your shaping isn't in the file sent to the GP-5: baking it in needs the capture trainer, which this version doesn't include." : "No conversion needed. Your level and info edits go with it."}</Sub>
         </Step>
         {toneId !== null ? (

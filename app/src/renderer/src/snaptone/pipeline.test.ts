@@ -30,11 +30,14 @@ describe("pcmRoundTrip", () => {
   });
 });
 
+/** The kernels the worker fetches, read from disk. */
+const kernels = (arch: "A1" | "A2") => file(arch === "A2" ? "a2kernel.wasm" : "a1kernel.wasm");
+
 describe("namToCloneBlob", () => {
-  it.skipIf(!existsSync(SIGNAL))("matches the clone Valeton Suite 2.1.0 makes from the same model", { timeout: 120_000 }, async () => {
+  it.skipIf(!existsSync(SIGNAL))("matches the clone Valeton Suite 2.1.0 makes from the same A1 model", { timeout: 120_000 }, async () => {
     const excitation = readSignalWav(new Uint8Array(readFileSync(SIGNAL)));
     expect(excitation.length).toBe(SIGNAL_FRAMES);
-    const blob = await namToCloneBlob(file("fixtures/wavenet_a1_standard.nam").toString("utf8"), excitation, file("a1kernel.wasm"));
+    const blob = await namToCloneBlob(file("fixtures/wavenet_a1_standard.nam").toString("utf8"), excitation, kernels);
     const suite = new Uint8Array(file("../gp5/fixtures/snaptone-a1std.clo"));
 
     expect(checkCloneBlob(blob)).toBeNull();
@@ -44,5 +47,18 @@ describe("namToCloneBlob", () => {
     expect(relError(f32(blob, 0x68, 0x78), f32(suite, 0x68, 0x78))).toBeLessThan(1e-3);
     expect(relError(f32(blob, 0x88, 0x288), f32(suite, 0x88, 0x288))).toBeLessThan(1e-3);
     expect(relError(f32(blob, 0x288, 0x2288), f32(suite, 0x288, 0x2288))).toBeLessThan(1e-3);
+  });
+
+  it.skipIf(!existsSync(SIGNAL))("matches the clone Valeton Suite 2.1.0 makes from an A2 container", { timeout: 120_000 }, async () => {
+    const excitation = readSignalWav(new Uint8Array(readFileSync(SIGNAL)));
+    const blob = await namToCloneBlob(file("fixtures/nam_core_a2.nam").toString("utf8"), excitation, kernels);
+    const suite = new Uint8Array(file("../gp5/fixtures/snaptone-a2.clo"));
+
+    expect(checkCloneBlob(blob)).toBeNull();
+    // The A2 render is bit-exact with Suite's, so only HTKPA's libm rounding is left (measured 1.6e-6 and 3.2e-6).
+    expect(blob.subarray(0x0a, 0x78)).toEqual(suite.subarray(0x0a, 0x78));
+    expect(blob.subarray(0x78, 0x88)).toEqual(suite.subarray(0x78, 0x88));
+    expect(relError(f32(blob, 0x88, 0x288), f32(suite, 0x88, 0x288))).toBeLessThan(2e-5);
+    expect(relError(f32(blob, 0x288, 0x2288), f32(suite, 0x288, 0x2288))).toBeLessThan(2e-5);
   });
 });

@@ -4,11 +4,30 @@ import type { T3kGear, T3kModel, T3kTone, ToneRecord } from "./host/tones";
 export type Verdict =
   | { kind: "ready" }
   | { kind: "reshape" }
-  | { kind: "not-loadable"; reason: "a2" | "small" | "custom" | "format" }
+  | { kind: "not-loadable"; reason: "custom" | "format" }
   | { kind: "ir" };
 
-/** The GP-5 (via Valeton Suite) loads NAM A1 standard WaveNet only. */
-export const isGp5Model = (m: Pick<T3kModel, "architecture_version" | "size">) => m.architecture_version === "1" && m.size === "standard";
+/** A1 sizes Tone Studio renders (the NAM trainer presets); "custom" A1 layouts aren't among them. */
+const A1_SIZES = ["standard", "lite", "feather", "nano"];
+
+/**
+ * Models Tone Studio turns into GP-5 SnapTones the way Valeton Suite 2.1.0 does: NAM A1 at the trainer sizes and
+ * NAM A2 (Suite renders the A2 container's full-size submodel). Custom architectures aren't rendered here.
+ */
+export const isGp5Model = (m: Pick<T3kModel, "architecture_version" | "size">) =>
+  m.architecture_version === "2" || (m.architecture_version === "1" && A1_SIZES.includes(m.size));
+
+/** Preference for the default model: A2, then A1 from the largest size down. */
+const gp5Rank = (m: Pick<T3kModel, "architecture_version" | "size">) => (m.architecture_version === "2" ? 0 : 1 + A1_SIZES.indexOf(m.size));
+
+/**
+ * The tone's GP-5 models, best first. A tone that has both an A2 and an A1 of a capture defaults to the A2: both
+ * reach the pedal through the same SnapTone conversion (Suite renders either and clones the result), A2 is
+ * TONE3000's more accurate architecture, and Tone Studio renders it bit-for-bit like Suite. Ties keep TONE3000's order.
+ */
+export function gp5Models<M extends Pick<T3kModel, "architecture_version" | "size">>(models: M[]): M[] {
+  return models.filter(isGp5Model).sort((a, b) => gp5Rank(a) - gp5Rank(b));
+}
 
 /**
  * Verdict from list data only (cards). Exact per-model answers need `models()`; whether a file needs the
@@ -18,9 +37,8 @@ export function toneVerdict(tone: Pick<T3kTone, "format" | "a1_models_count" | "
   if (tone.format === "ir") return { kind: "ir" };
   if (tone.format !== "nam") return { kind: "not-loadable", reason: "format" };
   if (record?.gp5.verdict === "reshape") return { kind: "reshape" };
-  if (tone.a1_models_count > 0 && tone.sizes.includes("standard")) return { kind: "ready" };
-  if (tone.a1_models_count > 0) return { kind: "not-loadable", reason: "small" };
-  if (tone.a2_models_count > 0) return { kind: "not-loadable", reason: "a2" };
+  if (tone.a2_models_count > 0) return { kind: "ready" };
+  if (tone.a1_models_count > 0 && tone.sizes.some((s) => A1_SIZES.includes(s))) return { kind: "ready" };
   return { kind: "not-loadable", reason: "custom" };
 }
 
@@ -29,8 +47,6 @@ export function modelsVerdict(format: T3kTone["format"], models: Pick<T3kModel, 
   if (format === "ir") return { kind: "ir" };
   if (format !== "nam") return { kind: "not-loadable", reason: "format" };
   if (models.some(isGp5Model)) return record?.gp5.verdict === "reshape" ? { kind: "reshape" } : { kind: "ready" };
-  if (models.some((m) => m.architecture_version === "1")) return { kind: "not-loadable", reason: "small" };
-  if (models.some((m) => m.architecture_version === "2")) return { kind: "not-loadable", reason: "a2" };
   return { kind: "not-loadable", reason: "custom" };
 }
 
@@ -43,13 +59,7 @@ export function verdictLabel(v: Verdict): string {
     case "ir":
       return "Goes to a User IR slot";
     case "not-loadable":
-      return v.reason === "a2"
-        ? "GP-5 can't load this (A2 only)"
-        : v.reason === "small"
-          ? "GP-5 can't load this (lite and nano only)"
-          : v.reason === "format"
-            ? "GP-5 can't load this format"
-            : "GP-5 can't load this (custom layout)";
+      return v.reason === "format" ? "GP-5 can't load this format" : "Tone Studio can't convert this (custom layout)";
   }
 }
 

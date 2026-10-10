@@ -22,7 +22,8 @@ import { useNav, type Screen } from "./nav";
  *     useFileHandler("prst", (files) => importFiles(files));
  * `files` are `OpenFile`s: `path` is set in Electron, `file` (a browser File) is set when dropped in the
  * web build or in Electron. Same delivery rule as commands: .prst → Library, .nam → capture editor,
- * .wav → Tones.
+ * .wav → Tones, other audio (mp3, flac …) → Song. The Song screen also takes .wav while it is showing (its
+ * handler is the most recent one then).
  *
  * ── Rig focus ─────────────────────────────────────────────────────────────────────────────────────
  * `focusRig({ block, picker, fxid })` switches to the Rig and asks it to select block `block` (GP-5 storage
@@ -78,8 +79,10 @@ export const COMMAND_HOME: Record<AppCommand, Screen> = {
   "browse-tone3000": "tones",
 };
 
-export type FileKind = "prst" | "nam" | "wav";
-export const FILE_HOME: Record<FileKind, Screen> = { prst: "library", nam: "capture", wav: "tones" };
+/** "audio": songs for the Song screen (mp3, flac, m4a, aac, ogg, opus). A .wav is an IR for Tones, unless Song is showing. */
+export type FileKind = "prst" | "nam" | "wav" | "audio";
+export const FILE_HOME: Record<FileKind, Screen> = { prst: "library", nam: "capture", wav: "tones", audio: "song" };
+const SONG_EXTENSIONS = ["mp3", "flac", "m4a", "aac", "ogg", "oga", "opus"];
 
 export interface OpenFile {
   name: string;
@@ -91,7 +94,8 @@ export interface OpenFile {
 
 export const fileKind = (name: string): FileKind | null => {
   const ext = /\.([a-z0-9]+)$/i.exec(name)?.[1]?.toLowerCase();
-  return ext === "prst" || ext === "nam" || ext === "wav" ? ext : null;
+  if (ext === "prst" || ext === "nam" || ext === "wav") return ext;
+  return ext && SONG_EXTENSIONS.includes(ext) ? "audio" : null;
 };
 
 // ── bus internals ──────────────────────────────────────────────────────────────────────────────────
@@ -142,7 +146,7 @@ export function hasCommandHandler(cmd: AppCommand): boolean {
   return (handlers.get(cmd)?.length ?? 0) > 0;
 }
 
-/** Hand files to their owner (Library for .prst, capture editor for .nam, Tones for .wav). */
+/** Hand files to their owner (Library for .prst, capture editor for .nam, Tones for .wav, Song for other audio). */
 export function openFiles(files: OpenFile[]): { ignored: OpenFile[] } {
   const groups = new Map<FileKind, OpenFile[]>();
   const ignored: OpenFile[] = [];
@@ -151,8 +155,8 @@ export function openFiles(files: OpenFile[]): { ignored: OpenFile[] } {
     if (!k) ignored.push(f);
     else groups.set(k, [...(groups.get(k) ?? []), f]);
   }
-  // One screen can be shown at a time: .prst wins, then .nam, then .wav.
-  for (const kind of ["wav", "nam", "prst"] as const) {
+  // One screen can be shown at a time: .prst wins, then .nam, then .wav, then songs.
+  for (const kind of ["audio", "wav", "nam", "prst"] as const) {
     const g = groups.get(kind);
     if (g) dispatch(`open:${kind}`, FILE_HOME[kind], g);
   }

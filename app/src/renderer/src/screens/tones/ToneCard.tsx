@@ -32,13 +32,11 @@ export function linkLabel(record: ToneRecord | undefined): string | null {
 }
 
 const REASON: Record<string, string> = {
-  ready: "This tone has an A1 standard model, the only NAM size the GP-5 loads.",
-  reshape: "The A1 standard file is in NAM 0.7 format. Tone Studio converts it to the 0.5 layout Valeton Suite imports, without changing the sound.",
+  ready: "This tone has NAM A1 or A2 models. Tone Studio turns them into GP-5 SnapTones the way Valeton Suite does.",
+  reshape: "The A1 file is in NAM 0.7 format. Tone Studio converts it to the 0.5 layout Valeton Suite imports, without changing the sound.",
   ir: "IRs go to one of the GP-5's 20 User IR slots through Valeton Suite.",
-  a2: "The GP-5 loads NAM A1 standard only. This tone has A2 models only.",
-  small: "The GP-5 loads NAM A1 standard only. This tone has smaller A1 sizes (lite, feather, nano) only.",
-  custom: "The GP-5 loads NAM A1 standard only. This tone uses a custom layout.",
-  format: "The GP-5 loads NAM captures and WAV IRs only.",
+  custom: "This tone uses a custom NAM layout. Tone Studio can't turn it into a SnapTone.",
+  format: "The GP-5 takes SnapTones made from NAM captures, and WAV IRs.",
 };
 
 export function CompatVerdict({ verdict, linked, className }: { verdict: Verdict; linked: string | null; className?: string }) {

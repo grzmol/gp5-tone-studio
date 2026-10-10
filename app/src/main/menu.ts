@@ -66,6 +66,7 @@ export function buildMenu(getWindow: () => BrowserWindow | null): void {
         { label: "Library", accelerator: "Shift+CmdOrCtrl+2", click: send("go-library") },
         { label: "Tones", accelerator: "Shift+CmdOrCtrl+3", click: send("go-tones") },
         { label: "Device", accelerator: "Shift+CmdOrCtrl+4", click: send("go-device") },
+        { label: "Song", accelerator: "Shift+CmdOrCtrl+5", click: send("go-song") },
         { type: "separator" },
         { label: "Command palette", accelerator: "CmdOrCtrl+K", click: send("command-palette") },
         { type: "separator" },

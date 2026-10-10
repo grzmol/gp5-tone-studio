@@ -52,4 +52,5 @@ export type MenuCommand =
   | "go-library"
   | "go-tones"
   | "go-device"
+  | "go-song"
   | "settings";

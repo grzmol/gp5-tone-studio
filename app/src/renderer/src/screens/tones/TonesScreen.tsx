@@ -183,7 +183,7 @@ function Head() {
             </DropdownMenuContent>
           </DropdownMenu>
         ) : account?.status === "expired" ? (
-          <Button variant="ghost" size="sm" onClick={() => browse({ architecture: "1" })}>
+          <Button variant="ghost" size="sm" onClick={() => browse()}>
             Sign in again
           </Button>
         ) : (
@@ -274,7 +274,7 @@ function SignedOut({ desktopOnly }: { desktopOnly?: boolean }) {
             Open TONE3000 in your browser
           </Button>
         ) : account?.configured ? (
-          <Button onClick={() => browse({ architecture: "1" })}>{account.status === "expired" ? "Sign in again" : "Sign in to TONE3000"}</Button>
+          <Button onClick={() => browse()}>{account.status === "expired" ? "Sign in again" : "Sign in to TONE3000"}</Button>
         ) : null}
       </EmptyContent>
     </Empty>

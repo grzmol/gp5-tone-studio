@@ -322,7 +322,7 @@ function SizeTab({ recipe, info, readOnly }: { recipe: CaptureRecipe; info: NamI
           </RadioGroupPrimitive.Item>
         ))}
       </RadioGroupPrimitive.Root>
-      <p className="text-[12px] text-silkscreen-3">A GP-5 version is always learned from A2-Full, whatever you export here.</p>
+      <p className="text-[12px] text-silkscreen-3">The GP-5 SnapTone is made from the largest size the exported file keeps, like Valeton Suite does.</p>
     </>
   );
 }

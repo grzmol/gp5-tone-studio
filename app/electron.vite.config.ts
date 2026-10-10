@@ -9,5 +9,7 @@ export default defineConfig({
   renderer: {
     resolve: { alias: { "@": resolve("src/renderer/src"), "@shared": resolve("src/shared") } },
     plugins: [react(), tailwindcss()],
+    // onnxruntime-web (Song stem splitter worker) ships a ready ESM bundle; pre-bundling it on first use reloads the page.
+    optimizeDeps: { exclude: ["onnxruntime-web"] },
   },
 });

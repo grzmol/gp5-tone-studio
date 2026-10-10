@@ -16,6 +16,7 @@ import { LibraryScreen } from "@/screens/library/LibraryScreen";
 import { TonesScreen } from "@/screens/tones/TonesScreen";
 import { DeviceScreen } from "@/screens/device/DeviceScreen";
 import { CaptureEditorScreen } from "@/screens/capture/CaptureEditorScreen";
+import { SongScreen } from "@/screens/song/SongScreen";
 
 const SCREENS: Record<Screen, ComponentType> = {
   rig: RigScreen,
@@ -23,6 +24,7 @@ const SCREENS: Record<Screen, ComponentType> = {
   tones: TonesScreen,
   device: DeviceScreen,
   capture: CaptureEditorScreen,
+  song: SongScreen,
 };
 
 /** Window frame: 52px title bar, floating glass rail, the active screen, 30px status bar, app-wide overlays. */
@@ -59,7 +61,7 @@ function useLaunchParams() {
   useEffect(() => {
     const q = new URLSearchParams(location.search);
     const screen = q.get("screen");
-    if (screen === "rig" || screen === "library" || screen === "tones" || screen === "device" || screen === "capture") useNav.getState().go(screen, q.get("param"));
+    if (screen === "rig" || screen === "library" || screen === "tones" || screen === "device" || screen === "capture" || screen === "song") useNav.getState().go(screen, q.get("param"));
     if (q.has("mock")) void useDevice.getState().connect("mock").catch(() => {});
     else if (isElectron) void useDevice.getState().connect("webmidi").catch(() => {});
   }, []);

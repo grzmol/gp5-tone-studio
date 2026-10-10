@@ -5,6 +5,7 @@
  * wavenet set_weights_: per layer array rechannel, then per layer conv (out, in, kernel) + bias, input mixin,
  * 1x1 + bias; then head (+ bias); head_scale last.
  */
+import { BLOCK, loadKernel, renderBlocks } from "./kernel";
 
 export interface A1Layer {
   dilation: number;
@@ -90,33 +91,14 @@ export function parseA1(text: string): A1Model {
 const LAYER_BYTES = 36; // dilation, look + 7 pointers
 const ARRAY_BYTES = 32; // inSize, channels, headSize, numLayers + 4 pointers
 const MODEL_BYTES = 36; // numArrays, headScale + 7 pointers
-const BLOCK = 1024; // Valeton renders in 1024-frame blocks (the block size does not change the result)
-const PAGE = 65536;
 
 /**
  * Render `x` through `model` with the kernel in `wasm` (the a1kernel.wasm bytes). `onProgress` gets the
  * fraction done. Output has x.length samples.
  */
 export async function renderA1(wasm: BufferSource, model: A1Model, x: Float32Array, onProgress?: (fraction: number) => void): Promise<Float32Array> {
-  const memory = new WebAssembly.Memory({ initial: 64 });
-  const { instance } = await WebAssembly.instantiate(wasm, { env: { memory } });
-  const { a1_process: process, __heap_base: heapBase } = instance.exports;
-  if (typeof process !== "function" || !(heapBase instanceof WebAssembly.Global)) throw new Error("a1kernel.wasm lacks its exports");
-
-  let top = (Number(heapBase.value) + 15) & ~15;
-  const alloc = (bytes: number): number => {
-    const p = top;
-    top = (top + bytes + 15) & ~15;
-    if (top > memory.buffer.byteLength) memory.grow(Math.ceil((top - memory.buffer.byteLength) / PAGE));
-    return p;
-  };
-  const put = (data: Float32Array): number => {
-    const p = alloc(data.byteLength);
-    new Float32Array(memory.buffer, p, data.length).set(data);
-    return p;
-  };
-  const writeI32 = (p: number, values: number[]) => new Int32Array(memory.buffer, p, values.length).set(values);
-
+  const { heap, process } = await loadKernel(wasm, "a1_process");
+  const { alloc, put, writeI32 } = heap;
   const maxC = Math.max(...model.arrays.map((a) => a.channels));
   const arraysPtr = alloc(ARRAY_BYTES * model.arrays.length);
   const headOutTable = alloc(4 * model.arrays.length);
@@ -131,24 +113,7 @@ export async function renderA1(wasm: BufferSource, model: A1Model, x: Float32Arr
   });
   const modelPtr = alloc(MODEL_BYTES);
   const work = Array.from({ length: 5 }, () => alloc(4 * maxC * BLOCK)); // hA, hB, arrayOut, z, headSum
-  const inPtr = alloc(4 * BLOCK);
-  const outPtr = alloc(4 * BLOCK);
   writeI32(modelPtr, [model.arrays.length, 0, arraysPtr, ...work, headOutTable]);
-  new Float32Array(memory.buffer, modelPtr + 4, 1)[0] = model.headScale;
-
-  const run = (src: Float32Array, n: number) => {
-    new Float32Array(memory.buffer, inPtr, n).set(src.subarray(0, n));
-    (process as (m: number, i: number, o: number, n: number) => void)(modelPtr, inPtr, outPtr, n);
-    return new Float32Array(memory.buffer, outPtr, n);
-  };
-  const zeros = new Float32Array(BLOCK);
-  for (let done = 0; done < model.receptiveField; done += BLOCK) run(zeros, BLOCK);
-  const y = new Float32Array(x.length);
-  for (let s = 0; s < x.length; s += BLOCK) {
-    const n = Math.min(BLOCK, x.length - s);
-    y.set(run(x.subarray(s, s + n), n), s);
-    if (onProgress && (s / BLOCK) % 256 === 0) onProgress(s / x.length);
-  }
-  onProgress?.(1);
-  return y;
+  heap.writeF32(modelPtr + 4, [model.headScale]);
+  return renderBlocks(heap, process, modelPtr, x, model.receptiveField, onProgress);
 }

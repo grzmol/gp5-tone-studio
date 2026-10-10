@@ -10,6 +10,7 @@ import { registerTonesIpc } from "./ipc/tones";
 import { registerCaptureIpc } from "./ipc/capture";
 import { registerDeviceIpc } from "./ipc/device";
 import { registerSnapToneIpc } from "./ipc/snaptone";
+import { registerSongIpc } from "./ipc/song";
 import type { AppEvent } from "@shared/ipc";
 
 // One app instance = one MIDI session (the GP-5 port is exclusive on Windows).
@@ -181,6 +182,7 @@ app.whenReady().then(async () => {
   registerCaptureIpc(getWindow);
   registerDeviceIpc(getWindow);
   registerSnapToneIpc(getWindow);
+  registerSongIpc(getWindow);
   buildMenu(getWindow);
   await createWindow();
 

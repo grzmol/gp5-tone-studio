@@ -25,14 +25,12 @@ export interface Verdict {
 /** GP-5 compatibility of the open capture (head pill and pipeline). */
 export function verdictOf(info: NamInfo, linkedSlot: number | null): Verdict {
   if (info.unsupported) return { tone: "fault", label: "Can't convert this capture", reason: info.unsupported };
-  if (info.arch.kind === "A1" && info.arch.size !== "standard") {
-    return { tone: "fault", label: "GP-5 can't load this", reason: `The GP-5 loads NAM A1 standard only. This file is A1 ${info.arch.size}.` };
-  }
-  if (info.arch.kind === "A1") {
-    if (linkedSlot !== null) return { tone: "on", label: `Linked to slot ${linkedSlot} on your GP-5`, reason: "This tone is linked to a user SnapTone slot on your GP-5." };
-    return { tone: "on", label: "Ready for GP-5", reason: "NAM A1 standard: Tone Studio can turn it into a SnapTone and write it to the pedal." };
-  }
-  return { tone: "warn", label: "GP-5 needs A1: convert", reason: "The GP-5 loads NAM A1 standard only. This A2 capture needs an A1 version first." };
+  if (linkedSlot !== null) return { tone: "on", label: `Linked to slot ${linkedSlot} on your GP-5`, reason: "This tone is linked to a user SnapTone slot on your GP-5." };
+  const reason =
+    info.arch.kind === "A1"
+      ? `NAM A1 ${info.arch.size}: Tone Studio turns it into a SnapTone the way Valeton Suite does and writes it to the pedal.`
+      : "NAM A2: Tone Studio renders its Full size into a SnapTone the way Valeton Suite does and writes it to the pedal.";
+  return { tone: "on", label: "Ready for GP-5", reason };
 }
 
 export function Head({ onOpenFile }: { onOpenFile: () => void }) {
