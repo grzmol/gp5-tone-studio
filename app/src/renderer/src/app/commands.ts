@@ -43,6 +43,8 @@ export function runMenuCommand(cmd: MenuCommand): void {
       return go("tones");
     case "go-device":
       return go("device");
+    case "go-song":
+      return go("song");
     case "settings":
       return go("device", "settings");
     case "command-palette":
@@ -73,7 +75,7 @@ function onKeyDown(e: KeyboardEvent): void {
 
   if (mod && !e.altKey && !e.shiftKey && key === "k") cmd = "command-palette";
   else if (modalOpen()) return;
-  else if (mod && e.shiftKey && !e.altKey && /^Digit[1-4]$/.test(e.code)) cmd = web ? (["go-rig", "go-library", "go-tones", "go-device"] as const)[Number(e.code[5]) - 1] : null;
+  else if (mod && e.shiftKey && !e.altKey && /^Digit[1-5]$/.test(e.code)) cmd = web ? (["go-rig", "go-library", "go-tones", "go-device", "go-song"] as const)[Number(e.code[5]) - 1] : null;
   else if (mod && !e.altKey && (e.code === "BracketLeft" || e.code === "BracketRight")) step = e.code === "BracketLeft" ? -1 : 1;
   else if (mod && !e.altKey && !e.shiftKey && key === "s") cmd = web ? "save-to-slot" : null;
   else if (mod && !e.altKey && !e.shiftKey && key === "d") cmd = web ? "compare-with-saved" : null;

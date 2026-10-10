@@ -8,7 +8,8 @@ import { notifyError } from "../notify";
 const hasFiles = (e: DragEvent) => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files");
 
 /**
- * Window-wide drop target (electron.md › Files): .prst → Library, .nam → capture editor, .wav → Tones.
+ * Window-wide drop target (electron.md › Files): .prst → Library, .nam → capture editor, .wav → Tones, other audio
+ * (mp3, flac …) → Song. On the Song screen a .wav is a song too (its handler wins while it is mounted).
  * Screens with their own drop zones (Library panes) handle the drop first and call preventDefault;
  * only unclaimed drops reach this listener. The overlay is a visual hint and never blocks those zones.
  */
@@ -44,7 +45,7 @@ export function FileDropOverlay() {
       if (ignored.length)
         notifyError(
           ignored.length === 1 ? `Can't open ${ignored[0].name}` : `Can't open ${ignored.length} files`,
-          new Error("Tone Studio opens .prst presets, .nam captures and .wav impulse responses."),
+          new Error("Tone Studio opens .prst presets, .nam captures, .wav impulse responses and songs (MP3, FLAC, M4A, OGG)."),
         );
     };
     window.addEventListener("dragenter", enter);
@@ -67,7 +68,11 @@ export function FileDropOverlay() {
         <FileDown className="size-5 text-silkscreen-2" />
         <div className="flex flex-col gap-0.5">
           <b className="font-semibold">Drop to open</b>
-          <span className="text-xs text-silkscreen-2">Presets (.prst) go to the Library, NAM captures to the capture editor, IRs (.wav) to Tones</span>
+          <span className="text-xs text-silkscreen-2">
+            {screen === "song"
+              ? "Songs (WAV, MP3, FLAC, M4A, OGG) are split into stems here"
+              : "Presets (.prst) go to the Library, NAM captures to the capture editor, IRs (.wav) to Tones, songs to Song"}
+          </span>
         </div>
       </div>
     </div>

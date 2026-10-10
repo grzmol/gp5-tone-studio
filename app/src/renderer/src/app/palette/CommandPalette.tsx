@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Command as CommandPrimitive } from "cmdk";
 import type { LucideIcon } from "lucide-react";
 import {
+  AudioLines,
   AudioWaveform,
   Cable,
   ExternalLink,
@@ -223,6 +224,7 @@ function useGroups(close: () => void): Group[] {
         ["library", "Library", LibraryBig, "2"],
         ["tones", "Tones", AudioWaveform, "3"],
         ["device", "Device", Usb, "4"],
+        ["song", "Song", AudioLines, "5"],
       ] as const
     ).map(([screen, label, icon, n]) => actionEntry({ id: `go-${screen}`, label: `Go to ${label}`, icon, keys: ["Mod", "Shift", n], words: ["screen", "open"], run: go(screen) }));
 
@@ -310,7 +312,7 @@ function useGroups(close: () => void): Group[] {
       { heading: "Models", entries: models, limit: 6 },
       { heading: "Actions", entries: actions, idle: 4, limit: 6 },
       { heading: "Tones", entries: tones, idle: 3, limit: 5 },
-      { heading: "Go to", entries: screens, limit: 4 },
+      { heading: "Go to", entries: screens, limit: 5 },
     ];
   }, [names, slot, connected, unsaved, preset, snapTones, userIRs, busy, recent, close]);
 }

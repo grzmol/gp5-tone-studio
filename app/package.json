@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
     "test:toolkit": "node --test src/renderer/src/gp5/tests/",
-    "build:wasm": "clang --target=wasm32 -O3 -msimd128 -nostdlib -Wl,--no-entry -Wl,--export=a1_process -Wl,--export=__heap_base -Wl,--import-memory -o src/renderer/src/snaptone/a1kernel.wasm src/renderer/src/snaptone/a1kernel.c",
+    "build:wasm": "clang --target=wasm32 -O3 -msimd128 -nostdlib -Wl,--no-entry -Wl,--export=a1_process -Wl,--export=__heap_base -Wl,--import-memory -o src/renderer/src/snaptone/a1kernel.wasm src/renderer/src/snaptone/a1kernel.c && clang --target=wasm32 -O3 -msimd128 -nostdlib -Wl,--no-entry -Wl,--export=a2_process -Wl,--export=__heap_base -Wl,--import-memory -o src/renderer/src/snaptone/a2kernel.wasm src/renderer/src/snaptone/a2kernel.c",
     "dist": "electron-vite build && electron-builder"
   },
   "devDependencies": {
@@ -45,6 +45,7 @@
     "cmdk": "^1.1.1",
     "lucide-react": "^1.52.0",
     "neural-amp-modeler-wasm": "^2.0.1",
+    "onnxruntime-web": "1.30.0",
     "radix-ui": "^1.7.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

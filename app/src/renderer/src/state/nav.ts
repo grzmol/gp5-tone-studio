@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type Screen = "rig" | "library" | "tones" | "device" | "capture";
+export type Screen = "rig" | "library" | "tones" | "device" | "capture" | "song";
 
 export interface NavState {
   screen: Screen;
