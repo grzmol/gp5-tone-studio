@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { host } from "@/host";
 import { useUi } from "@/state/ui";
+import { checkForUpdates } from "../updates";
 
 const PLATFORM: Record<string, string> = { darwin: "macOS", win32: "Windows", linux: "Linux" };
 
@@ -36,6 +37,11 @@ export function AboutDialog() {
         </DialogDescription>
         <p className="text-xs text-pretty text-silkscreen-3">Valeton and GP-5 are trademarks of their owners. This app is not made or endorsed by Valeton.</p>
         <DialogFooter>
+          {host.kind === "electron" && (
+            <Button variant="outline" onClick={() => void checkForUpdates()}>
+              Check for updates
+            </Button>
+          )}
           <DialogClose asChild>
             <Button>Close</Button>
           </DialogClose>

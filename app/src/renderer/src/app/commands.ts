@@ -7,6 +7,7 @@ import { openFiles, runCommand, useUi, type AppCommand } from "@/state/ui";
 import { modKey } from "./keys";
 import { notifyError } from "./notify";
 import { requestPresetSwitch } from "./preset-switch";
+import { checkForUpdates } from "./updates";
 
 /** Reconnect to the pedal in the current mode (simulated stays simulated). */
 export async function reconnect(): Promise<void> {
@@ -51,6 +52,8 @@ export function runMenuCommand(cmd: MenuCommand): void {
       return ui.setPaletteOpen(!ui.paletteOpen);
     case "about":
       return ui.setAboutOpen(true);
+    case "check-updates":
+      return void checkForUpdates();
     case "reconnect":
       return void reconnect();
     default:

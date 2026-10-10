@@ -11,6 +11,7 @@ export function buildMenu(getWindow: () => BrowserWindow | null): void {
             label: "VLTN Tone Studio",
             submenu: [
               { label: "About VLTN Tone Studio", click: send("about") },
+              { label: "Check for updates…", click: send("check-updates") },
               { type: "separator" as const },
               { label: "Settings…", accelerator: "Cmd+,", click: send("settings") },
               { type: "separator" as const },
@@ -78,6 +79,7 @@ export function buildMenu(getWindow: () => BrowserWindow | null): void {
       label: "Help",
       submenu: [
         { label: "Diagnostics report", click: send("diagnostics-report") },
+        ...(isMac ? [] : [{ label: "Check for updates…", click: send("check-updates") }]),
         { label: "About VLTN Tone Studio", click: send("about") },
       ],
     },

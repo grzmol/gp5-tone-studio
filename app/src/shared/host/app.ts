@@ -9,6 +9,8 @@ export interface AppSettings {
   portPattern: string | null;
   /** Ask for a backup before every write to pedal memory. */
   backupBeforeWrite: boolean;
+  /** Desktop app: look for a new release on GitHub after launch and every few hours. */
+  checkForUpdates: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -16,6 +18,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   valetonSuitePath: null,
   portPattern: null,
   backupBeforeWrite: true,
+  checkForUpdates: true,
 };
 
 export interface AppApi {

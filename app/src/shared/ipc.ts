@@ -48,6 +48,7 @@ export type MenuCommand =
   | "command-palette"
   | "diagnostics-report"
   | "about"
+  | "check-updates"
   | "go-rig"
   | "go-library"
   | "go-tones"

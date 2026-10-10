@@ -94,11 +94,14 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: packages-${{ matrix.os }}
+          # latest*.yml and the blockmaps are the in-app update feed (electron-builder.yml › publish).
           path: |
             app/dist/*.dmg
             app/dist/*.exe
             app/dist/*.AppImage
             app/dist/*.deb
+            app/dist/*.blockmap
+            app/dist/latest*.yml
           if-no-files-found: error
 
   publish:
@@ -122,13 +125,21 @@ jobs:
           TAG: ${{ needs.version.outputs.tag }}
         run: |
           ls -l packages
+          # The app updates itself from these; a release without them would leave Windows and AppImage users behind.
+          for feed in latest.yml latest-linux.yml; do
+            test -s "packages/$feed" || { echo "::error::$feed is missing, the in-app updater couldn't find this release"; exit 1; }
+            grep -qx "version: ${TAG#v}" "packages/$feed" || { echo "::error::$feed doesn't describe ${TAG#v}"; exit 1; }
+          done
           # This version's CHANGELOG section (up to the next "## [" heading or the link list), then the install notes.
           awk -v head="## [${TAG#v}]" 'index($0, head) == 1 { on = 1; next } on && (/^## \[/ || /^\[[^]]+\]: /) { exit } on' CHANGELOG.md > notes.md
           printf '\n' >> notes.md
           cat .github/release-notes.md >> notes.md
+          # Draft first, published once every file is uploaded: the updater never sees a release without its feed.
           gh release create "$TAG" packages/* \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "VLTN Tone Studio $TAG" \
             --notes-file notes.md \
-            --generate-notes
+            --generate-notes \
+            --draft
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
