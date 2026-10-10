@@ -26,6 +26,7 @@ import {
 } from "./protocol.mjs";
 import { GP5_BODY_LEN, bodyOf, detectDevice, rebuildPrst } from "./prst.mjs";
 import { encodeImportSnapTone, isUserSnapToneSlot, sanitizeSnapToneName } from "./snaptone.mjs";
+import { USER_IR, encodeImportUserIr, isUserIrSlot } from "./userir.mjs";
 
 export const DEFAULT_TIMING = Object.freeze({
   interMessageMs: 20, // TonexOneController: VALETON_GP5_INTER_MESSAGE_DELAY
@@ -34,8 +35,8 @@ export const DEFAULT_TIMING = Object.freeze({
   readTimeoutMs: 2500, // whole multi-frame reply must arrive within this
   ackTimeoutMs: 150, // per-frame ACK wait during writes/commands
   postSelectMs: 300, // after a preset change before reading 0x41 ("0.15 races; 0.25 clean")
-  snapToneAckTimeoutMs: 3000, // per-frame ACK wait of a SnapTone upload before resending (Suite: 3000 x 1 ms ticks)
-  snapToneResends: 9, // resends allowed per SnapTone upload (Suite fails the message after the 9th)
+  snapToneAckTimeoutMs: 3000, // per-frame ACK wait of a SnapTone / User IR upload before resending (Suite: 3000 x 1 ms ticks)
+  snapToneResends: 9, // resends allowed per SnapTone / User IR upload (Suite fails the message after the 9th)
   readRetries: 1,
 });
 
@@ -342,15 +343,39 @@ export class Gp5Session extends EventTarget {
 
   /**
    * Upload a 2696-byte SnapTone file (lib/snaptone.mjs) into user SnapTone slot `slot` (50..79) as `name`.
-   * Flow control as Valeton Suite: one frame per ACK; an ACK whose first data byte is not 0, or no ACK within
-   * snapToneAckTimeoutMs, resends the same frame; more than snapToneResends resends abort. The slot is then
-   * verified by re-reading the SnapTone table (0x24): it must hold user content under the sanitized name.
+   * Sent with the Suite file transport (#sendFileFrames), then verified by re-reading the SnapTone table (0x24):
+   * it must hold user content under the sanitized name.
    */
   async uploadSnapTone(slot, name, file, { confirm, onProgress } = {}) {
     this.#guard(confirm, "uploadSnapTone");
     if (!isUserSnapToneSlot(slot)) throw new Gp5Error("unsafe", `SnapTone uploads go to user slots 50..79, got ${slot}`);
     const label = sanitizeSnapToneName(name);
     const frames = packetize(encodeImportSnapTone(slot, label, file));
+    await this.#sendFileFrames(frames, "SnapTone", onProgress);
+    await this.#verifyTableEntry(() => this.readSnapTones(), slot, label, `SnapTone slot ${slot}`);
+    return { frames: frames.length, name: label, slot };
+  }
+
+  /**
+   * Upload a 2048-byte User IR data block (lib/userir.mjs) into User IR slot `slot` (0..19) as `name`.
+   * Same transport as SnapTone; the pedal sends no final reply, so the slot is verified through the User IR
+   * table (0x20). The IR content itself cannot be read back.
+   */
+  async uploadUserIr(slot, name, data, { confirm, onProgress } = {}) {
+    this.#guard(confirm, "uploadUserIr");
+    if (!isUserIrSlot(slot)) throw new Gp5Error("unsafe", `User IR uploads go to slots 0..${USER_IR.SLOTS - 1}, got ${slot}`);
+    const label = sanitizeSnapToneName(name);
+    const frames = packetize(encodeImportUserIr(slot, label, data));
+    await this.#sendFileFrames(frames, "User IR", onProgress);
+    await this.#verifyTableEntry(() => this.readUserIRs(), slot, label, `User IR ${slot + 1}`);
+    return { frames: frames.length, name: label, slot };
+  }
+
+  /**
+   * Suite's file-upload flow control (SnapTone, User IR): one frame per ACK; an ACK whose first data byte is
+   * not 0, or no ACK within snapToneAckTimeoutMs, resends the same frame; more than snapToneResends resends abort.
+   */
+  async #sendFileFrames(frames, what, onProgress) {
     await sleep(300); // let the pedal finish flash work from earlier commands, as before preset writes
     await this.exclusive(async () => {
       let resends = 0;
@@ -365,16 +390,20 @@ export class Gp5Session extends EventTarget {
           i++;
           onProgress?.(i, frames.length);
         } else if (++resends > this.#timing.snapToneResends) {
-          throw new Gp5Error("verify", `SnapTone upload stopped at frame ${i + 1}/${frames.length}: the pedal did not accept it`);
+          throw new Gp5Error("verify", `${what} upload stopped at frame ${i + 1}/${frames.length}: the pedal did not accept it`);
         }
       }
     });
+  }
+
+  /** A slot table entry must show user content (flag 0) under `label`; the pedal may need a moment to commit. */
+  async #verifyTableEntry(readTable, slot, label, what) {
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt) await sleep(500);
-      const entry = (await this.readSnapTones())[slot];
-      if (entry?.flag === 0 && entry.name === label) return { frames: frames.length, name: label, slot };
+      const entry = (await readTable())[slot];
+      if (entry?.flag === 0 && entry.name === label) return;
     }
-    throw new Gp5Error("verify", `SnapTone slot ${slot} does not show "${label}" after the upload`);
+    throw new Gp5Error("verify", `${what} does not show "${label}" after the upload`);
   }
 
   // ------------------------------------------------------------------------------------------- state sync

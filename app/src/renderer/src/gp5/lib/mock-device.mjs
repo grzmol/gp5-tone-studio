@@ -5,6 +5,7 @@
 import { BLOCKS, CC, CMD, FRAME_PAYLOAD_MAX, GLOBALS, KIND, PRESET_COUNT, READ, Reassembler, packetize, parseSysex, u32le } from "./protocol.mjs";
 import { BODY_OFF, GP5_BODY_LEN, applyEdits, bodyOf, readName, rebuildPrst } from "./prst.mjs";
 import { checkSnapToneFile, decodeImportSnapTone, isUserSnapToneSlot } from "./snaptone.mjs";
+import { decodeImportUserIr } from "./userir.mjs";
 
 const ACK = [KIND.ACK, 0x08, 0x00]; // device ACK frame BUF b2 01 00 03 14 08 00
 const readU32 = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
@@ -31,6 +32,7 @@ export class MockGp5 {
     this.snapTones = Array.from({ length: 80 }, (_, i) => (snapTones[i] ? { name: snapTones[i], flag: i < 50 ? 1 : 0 } : { name: i < 50 ? `Factory ${i + 1}` : "Empty", flag: 1 }));
     this.userIRs = Array.from({ length: 20 }, (_, i) => (userIRs[i] ? { name: userIRs[i], flag: 0 } : { name: `User IR ${i + 1}`, flag: 1 }));
     this.snapToneFiles = new Map(); // slot -> uploaded 2696-byte SnapTone file
+    this.userIrFiles = new Map(); // slot -> uploaded 2048-byte User IR data block
     this.latencyMs = latencyMs;
     this.minGapMs = minGapMs;
     this.acceptProgramChange = acceptProgramChange;
@@ -142,6 +144,14 @@ export class MockGp5 {
       case CMD.SAVE_PRESET: {
         const slot = readU32(p, 2);
         this.slots[slot] = { name: String.fromCharCode(...p.subarray(6, 16).filter((c) => c)), body: this.buffer.slice() };
+        return;
+      }
+      case CMD.IMPORT_USER_IR: {
+        // The pedal's reaction to an occupied slot or a malformed block is unknown; only a clean import is modelled.
+        const up = decodeImportUserIr(p);
+        if (!up) return;
+        this.userIRs[up.slot] = { name: up.name, flag: 0 };
+        this.userIrFiles.set(up.slot, up.data);
         return;
       }
       case CMD.RENAME_PRESET:

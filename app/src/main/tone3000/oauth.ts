@@ -1,4 +1,4 @@
-// Embedded TONE3000 OAuth (Select / Load Tone flows) in a WebContentsView layered over the main window.
+// Embedded TONE3000 OAuth (plain sign-in, Select / Load Tone flows) in a WebContentsView layered over the main window.
 // Pattern from tone-3000/t3k-api `electron/src/main/oauth.ts`: the view has no preload and its own persistent
 // partition; main owns the PKCE verifier and `state`, cancels the navigation to the redirect URI and
 // exchanges the code itself, so nothing has to listen on the redirect URI.

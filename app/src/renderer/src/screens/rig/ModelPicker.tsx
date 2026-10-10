@@ -70,8 +70,9 @@ function tilesFor(code: BlockCode, snapTones: SlotName[] | null, userIRs: SlotNa
     });
   return models.map((m) => {
     if (m.type === "User IR") {
+      // Catalog titles are 1-based ("User IR 1" = fxid 0x0A100000), the slot table 0-based.
       const n = Number(/\d+/.exec(m.title)?.[0] ?? 0);
-      const name = userIRs?.find((s) => s.slot === n || s.slot === n - 1)?.name;
+      const name = userIRs?.find((s) => s.slot === n - 1)?.name;
       return { model: m, title: name && !/^User IR \d+$/.test(name) ? `IR ${n} ${name}` : m.title, sub: "User IR slot" };
     }
     return { model: m, title: m.title, sub: m.origin ?? m.type };
@@ -318,7 +319,7 @@ function PickerPanel({ blockIndex, highlight, initialTab }: { blockIndex: number
           })}
           <p className="mx-1.5 mt-auto mb-1 text-xs text-pretty text-silkscreen-4">
             {code === "NS"
-              ? "Captures live in SnapTone slots on the pedal. New ones arrive through Tones and Valeton Suite."
+              ? "Captures live in SnapTone slots on the pedal. New ones arrive through Tones and the capture editor."
               : `Each GP-5 block holds one kind of effect, so ${article(NOUN[code])} ${NOUN[code]} can only go in ${code}.`}
           </p>
         </nav>

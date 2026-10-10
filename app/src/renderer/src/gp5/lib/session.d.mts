@@ -65,6 +65,12 @@ export interface SnapToneUploadResult {
   name: string;
   slot: number;
 }
+export interface UserIrUploadResult {
+  frames: number;
+  /** The name as stored on the pedal (Suite's name rule applied) */
+  name: string;
+  slot: number;
+}
 export interface SyncSnapshot {
   names: PresetNameRecord[];
   slot: number;
@@ -114,6 +120,13 @@ export class Gp5Session extends EventTarget {
     file: Uint8Array,
     opts: { confirm: true; onProgress?: (done: number, total: number) => void },
   ): Promise<SnapToneUploadResult>;
+  /** Upload a 2048-byte User IR data block into User IR slot 0..19; verified via the 0x20 table. */
+  uploadUserIr(
+    slot: number,
+    name: string,
+    data: Uint8Array,
+    opts: { confirm: true; onProgress?: (done: number, total: number) => void },
+  ): Promise<UserIrUploadResult>;
   syncState(): Promise<SyncSnapshot>;
 }
 

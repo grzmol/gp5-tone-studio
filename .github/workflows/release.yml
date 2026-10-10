@@ -1,5 +1,6 @@
 # Release: every push to main (a merge from develop) builds macOS, Windows and Linux packages and publishes
-# them as GitHub Release v<version>, where <version> comes from app/package.json. Bump it on develop before merging.
+# them as GitHub Release v<version>, where <version> comes from app/package.json. Bump it on develop before merging,
+# and add its "## [<version>]" section to CHANGELOG.md: that section opens the release notes.
 name: Release
 
 on:
@@ -28,9 +29,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="v$(node -p "require('./app/package.json').version")"
+          version="$(node -p "require('./app/package.json').version")"
+          tag="v$version"
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "::error::Release $tag already exists. Bump \"version\" in app/package.json on develop, then merge to main again."
+            exit 1
+          fi
+          if ! grep -qF "## [$version]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no \"## [$version]\" section. Add it on develop, then merge to main again."
             exit 1
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
@@ -103,7 +109,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          sparse-checkout: .github/release-notes.md
+          sparse-checkout: |
+            .github/release-notes.md
+            CHANGELOG.md
           sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@v5
         with:
@@ -114,9 +122,13 @@ jobs:
           TAG: ${{ needs.version.outputs.tag }}
         run: |
           ls -l packages
+          # This version's CHANGELOG section (up to the next "## [" heading or the link list), then the install notes.
+          awk -v head="## [${TAG#v}]" 'index($0, head) == 1 { on = 1; next } on && (/^## \[/ || /^\[[^]]+\]: /) { exit } on' CHANGELOG.md > notes.md
+          printf '\n' >> notes.md
+          cat .github/release-notes.md >> notes.md
           gh release create "$TAG" packages/* \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "VLTN Tone Studio $TAG" \
-            --notes-file .github/release-notes.md \
+            --notes-file notes.md \
             --generate-notes

@@ -9,6 +9,7 @@ import {
   FileUp,
   FolderOpen,
   GitCompareArrows,
+  Guitar,
   HardDriveDownload,
   Info,
   LibraryBig,
@@ -192,6 +193,15 @@ function useGroups(close: () => void): Group[] {
       actionEntry({ id: "discard", label: "Discard changes", icon: RotateCcw, words: ["revert"], blocked: unsaved ? pedal : "No changes", run: cmd("discard-changes") }),
       actionEntry({ id: "import", label: "Import presets…", icon: FileUp, keys: ["Mod", "O"], words: ["prst", "file"], run: cmd("import-presets") }),
       actionEntry({ id: "export", label: "Export preset…", icon: FileUp, keys: ["Mod", "E"], words: ["prst", "file"], run: cmd("export-preset") }),
+      actionEntry({
+        id: "tone-match",
+        label: "Tone match",
+        icon: Guitar,
+        hint: "Match a song's guitar tone on the GP-5",
+        words: ["tone match", "match", "guitar", "song", "stems", "preset", "ir"],
+        run: go("song", "tone"),
+      }),
+      actionEntry({ id: "split-song", label: "Split a song into stems", icon: AudioLines, words: ["stems", "song", "separate", "guitar", "vocals", "drums"], run: go("song", "stems") }),
       actionEntry({ id: "backups-folder", label: "Open backups folder", icon: FolderOpen, run: cmd("open-backups-folder") }),
       actionEntry({
         id: "reconnect",
@@ -289,7 +299,7 @@ function useGroups(close: () => void): Group[] {
         (t) =>
           ({
             id: `ir:${t.slot}`,
-            search: { primary: t.name, secondary: ["IR", "CAB", "impulse"], slot: t.slot },
+            search: { primary: t.name, secondary: ["IR", "CAB", "impulse"], slot: t.slot + 1 },
             verb: "open CAB",
             run: () => {
               close();
@@ -299,7 +309,7 @@ function useGroups(close: () => void): Group[] {
               <>
                 <Speaker className="size-4 text-silkscreen-3" aria-hidden />
                 <Name text={t.name} ranges={ranges} className="flex-1" />
-                <Hint>Cab IR slot {t.slot}</Hint>
+                <Hint>User IR {t.slot + 1}</Hint>
               </>
             ),
           }) satisfies Entry,

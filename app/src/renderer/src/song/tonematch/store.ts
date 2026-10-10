@@ -97,7 +97,11 @@ export const useToneMatch = create<ToneMatchState>((set, get) => ({
   },
 }));
 
-// Another song or a new split: the analysis no longer applies.
+// Another song or a new split: the old analysis no longer applies. Fresh stems are analysed right away (in the
+// worker), so the result is ready by the time anyone opens Tone match.
 useSong.subscribe((s, prev) => {
-  if (s.stems !== prev.stems) useToneMatch.getState().reset();
+  if (s.stems === prev.stems) return;
+  const tm = useToneMatch.getState();
+  tm.reset();
+  if (s.stems) void tm.analyse();
 });

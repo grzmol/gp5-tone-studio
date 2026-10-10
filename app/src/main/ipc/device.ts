@@ -164,6 +164,7 @@ export function registerDeviceIpc(getWindow: () => BrowserWindow | null): void {
           : process.platform === "darwin"
             ? [{ name: "Applications", extensions: ["app"] }]
             : [{ name: "All files", extensions: ["*"] }],
+      defaultPath: process.platform === "darwin" ? "/Applications" : undefined,
     };
     const win = getWindow();
     const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);

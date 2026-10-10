@@ -1,7 +1,7 @@
 // SnapTone test signal: Valeton Suite's assets/wavs/nam_input_wav.wav, which the SnapTone conversion plays through
-// a capture. It is Valeton's file, so Tone Studio doesn't ship it: the user points to it once (or main finds it in
-// the Valeton Suite install) and a copy is kept. Owner: snaptone (renderer/src/snaptone).
-// Main process: src/main/ipc/snaptone.ts.
+// a capture. It is Valeton's file, so published builds don't ship it: the user points to it once (or main finds it
+// in the Valeton Suite install) and a copy is kept. Local builds with the git-ignored fixture use that copy.
+// Owner: snaptone (renderer/src/snaptone). Main process: src/main/ipc/snaptone.ts.
 
 export interface SnapToneApi {
   /** Tone Studio already has the test signal (or can find it in Valeton Suite) */

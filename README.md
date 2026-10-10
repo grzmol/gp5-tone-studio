@@ -149,7 +149,7 @@ Diagnostics check each step of the connection to the pedal, and a live MIDI moni
 ## Tones from TONE3000.
 
 Browse and download NAM captures and IRs from TONE3000, and see which slots on your GP-5 already hold them.<br>
-A NAM capture, A1 or A2, becomes a SnapTone right in the app and goes straight to a user slot over USB. No Valeton Suite needed.<br>
+A NAM capture, A1 or A2, becomes a SnapTone right in the app and goes straight to a user slot over USB. IRs go straight to one of the 20 User IR slots. No Valeton Suite needed.<br>
 The capture editor plays your guitar through a capture, using the input of your audio interface.
 
 <br>
@@ -186,7 +186,7 @@ Record yourself through the GP-5 and it designs a cabinet IR that brings your to
 
 | Device | Support |
 |---|---|
-| **Valeton GP-5** | Live editing, library, backups and restore, SnapTones over USB |
+| **Valeton GP-5** | Live editing, library, backups and restore, SnapTones and User IRs over USB |
 | **Valeton GP-50** | `.prst` files: import, inspect and convert to the GP-5 |
 | **Other Valeton pedals** | Planned |
 
@@ -209,7 +209,7 @@ Record yourself through the GP-5 and it designs a cabinet IR that brings your to
 | **Connection** | WebMIDI with SysEx, straight to the pedal over USB |
 | **App** | Electron 43, React 19, TypeScript, Tailwind CSS v4 |
 | **Presets** | Reads and writes `.prst` files, byte for byte |
-| **SnapTones** | Converts NAM A1 and A2 captures the way Valeton Suite does, then uploads them over USB |
+| **SnapTones and IRs** | Converts NAM A1 and A2 captures the way Valeton Suite does, then uploads them and cab IRs over USB |
 | **Safety** | Backs up a slot automatically before it's overwritten |
 | **Packages** | `.dmg`, NSIS installer, AppImage and `.deb` |
 

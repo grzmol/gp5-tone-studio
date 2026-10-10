@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { notifyError } from "@/app/notify";
 import { host, isElectron } from "@/host";
 import { useNav } from "@/state/nav";
-import type { AccountState } from "@shared/host/tones";
+import { loadAccount, setAppKey, signOut, useTones } from "@/screens/tones/store";
 import { useAppSettings } from "./settings-store";
 
 /** Settings (`?screen=device&param=settings`): how Tone Studio behaves on this computer. */
@@ -20,6 +20,7 @@ export function SettingsView() {
   useEffect(() => {
     void load().catch((e) => notifyError("Couldn't read the settings", e));
     void host.app.version().then(setVersion, () => {});
+    void loadAccount();
   }, [load]);
 
   const save = (p: Parameters<typeof patch>[0]) => void patch(p).catch((e) => notifyError("Couldn't save the setting", e));
@@ -49,10 +50,14 @@ export function SettingsView() {
 
         <Section title="Pedal connection">
           <PortPatternRow value={settings.portPattern} disabled={!loaded} onSave={(portPattern) => save({ portPattern })} />
-          <SuitePathRow value={settings.valetonSuitePath} disabled={!loaded} onSave={(valetonSuitePath) => save({ valetonSuitePath })} />
+          {/* Only Windows and macOS builds read anything from the Suite install (the SnapTone test signal). */}
+          {isElectron && host.platform !== "linux" && (
+            <SuitePathRow value={settings.valetonSuitePath} disabled={!loaded} onSave={(valetonSuitePath) => save({ valetonSuitePath })} />
+          )}
         </Section>
 
         <Section title="TONE3000 account">
+          <AppKeyRow />
           <AccountRow />
         </Section>
 
@@ -136,30 +141,90 @@ function SuitePathRow({ value, disabled, onSave }: { value: string | null; disab
     }
   };
   return (
-    <Row label="Valeton Suite" description={isElectron ? "Used to send NAM captures and IRs to the pedal, and to finish firmware updates." : "Choosing and opening Valeton Suite needs the desktop app."}>
+    <Row
+      label="Valeton Suite"
+      description="Tone Studio takes Valeton's SnapTone test signal from this install. Firmware updates for the pedal also run in Suite."
+    >
+      <div className="flex h-[34px] min-w-0 flex-1 items-center gap-2 rounded-pill bg-well px-3.5 shadow-[inset_0_0_0_1px_var(--seam-strong)]">
+        <Package className="size-3.5 shrink-0 text-silkscreen-3" aria-hidden />
+        <span className={value ? "truncate text-silkscreen" : "truncate text-silkscreen-3"} title={value ?? undefined}>
+          {value ?? "Not chosen"}
+        </span>
+      </div>
+      <Button variant="outline" disabled={disabled} onClick={() => void pick()}>
+        {value ? "Change" : "Choose"}
+      </Button>
+      {value && (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Open Valeton Suite"
+          title="Open Valeton Suite"
+          onClick={() => void host.app.openPath(value).catch((e) => notifyError("Couldn't open Valeton Suite", e))}
+        >
+          <FolderOpen aria-hidden />
+        </Button>
+      )}
+    </Row>
+  );
+}
+
+function AppKeyRow() {
+  const account = useTones((s) => s.account);
+  const saved = account?.appKey ?? null;
+  const [draft, setDraft] = useState(saved ?? "");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => setDraft(saved ?? ""), [saved]);
+  const dirty = draft.trim() !== (saved ?? "");
+  const disabled = !account || busy;
+
+  const save = async (value: string | null) => {
+    setBusy(true);
+    try {
+      await setAppKey(value);
+    } catch (e) {
+      notifyError("Couldn't save the TONE3000 app key", e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Row
+      label="App key"
+      description={
+        isElectron
+          ? "The publishable key (client_id) of your TONE3000 app. Leave empty to use the key this build came with. A different key signs you out."
+          : "Signing in to TONE3000 needs the desktop app."
+      }
+    >
       {isElectron ? (
-        <>
-          <div className="flex h-[34px] min-w-0 flex-1 items-center gap-2 rounded-pill bg-well px-3.5 shadow-[inset_0_0_0_1px_var(--seam-strong)]">
-            <Package className="size-3.5 shrink-0 text-silkscreen-3" aria-hidden />
-            <span className={value ? "truncate text-silkscreen" : "truncate text-silkscreen-3"} title={value ?? undefined}>
-              {value ?? "Not chosen"}
-            </span>
-          </div>
-          <Button variant="outline" disabled={disabled} onClick={() => void pick()}>
-            {value ? "Change" : "Choose"}
+        <form
+          className="flex min-w-0 flex-1 items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void save(draft.trim() || null);
+          }}
+        >
+          <Input
+            value={draft}
+            disabled={disabled}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={account?.configured && !saved ? "Built into this build" : "Not set"}
+            aria-label="TONE3000 app key"
+            spellCheck={false}
+            autoComplete="off"
+            className="min-w-0 flex-1"
+          />
+          <Button type="submit" variant="outline" disabled={disabled || !dirty}>
+            Save
           </Button>
-          {value && (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Open Valeton Suite"
-              title="Open Valeton Suite"
-              onClick={() => void host.app.openPath(value).catch((e) => notifyError("Couldn't open Valeton Suite", e))}
-            >
-              <FolderOpen aria-hidden />
+          {saved && (
+            <Button type="button" variant="ghost" disabled={disabled} onClick={() => void save(null)}>
+              Clear
             </Button>
           )}
-        </>
+        </form>
       ) : (
         <span className="text-sm text-silkscreen-3">Needs the desktop app</span>
       )}
@@ -169,25 +234,12 @@ function SuitePathRow({ value, disabled, onSave }: { value: string | null; disab
 
 function AccountRow() {
   const go = useNav((s) => s.go);
-  const [account, setAccount] = useState<AccountState | null>(null);
-  const [failed, setFailed] = useState<string | null>(null);
+  const account = useTones((s) => s.account);
   const [confirm, setConfirm] = useState(false);
 
-  useEffect(() => {
-    let live = true;
-    host.tones.account().then(
-      (a) => live && setAccount(a),
-      (e: Error) => live && setFailed(e.message),
-    );
-    return () => {
-      live = false;
-    };
-  }, []);
-
-  const signOut = async () => {
+  const disconnect = async () => {
     try {
-      await host.tones.signOut();
-      setAccount(await host.tones.account());
+      await signOut();
       setConfirm(false);
     } catch (e) {
       notifyError("Couldn't sign out of TONE3000", e);
@@ -197,9 +249,7 @@ function AccountRow() {
   const user = account?.status === "signed-in" ? account.user : null;
   return (
     <Row label="TONE3000" description="Browse and download NAM captures and IRs. Signing in happens on TONE3000's own page.">
-      {failed ? (
-        <span className="text-sm text-silkscreen-3">{failed}</span>
-      ) : !account ? null : user ? (
+      {!account ? null : user ? (
         <>
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <Avatar className="size-8">
@@ -225,7 +275,7 @@ function AccountRow() {
                 <DialogClose asChild>
                   <Button variant="ghost">Cancel</Button>
                 </DialogClose>
-                <Button onClick={() => void signOut()}>Sign out</Button>
+                <Button onClick={() => void disconnect()}>Sign out</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

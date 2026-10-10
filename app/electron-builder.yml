@@ -17,6 +17,13 @@ files:
   - package.json
   - "!**/*.map"
 asarUnpack: []
+# Valeton's SnapTone test signal, only when it is in the git-ignored fixtures folder: local `npm run dist`
+# builds carry it, CI releases don't (the file isn't ours to publish).
+extraResources:
+  - from: src/renderer/src/snaptone/fixtures
+    to: snaptone
+    filter:
+      - nam_input_wav.wav
 
 # Double-clicking a preset (or "Open with VLTN Tone Studio") starts the app with the path; the
 # single-instance handler forwards it to the running window, which opens it in the Library.

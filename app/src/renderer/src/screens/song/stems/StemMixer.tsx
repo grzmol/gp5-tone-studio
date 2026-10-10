@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Download, Pause, Play } from "lucide-react";
+import { ChevronDown, Download, Guitar, Pause, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Slider } from "@/components/ui/slider";
@@ -7,6 +7,7 @@ import { Toggle } from "@/components/ui/toggle";
 import { host } from "@/host";
 import { notifyError, notifySuccess } from "@/app/notify";
 import { cn } from "@/lib/utils";
+import { useNav } from "@/state/nav";
 import { useStatusHints } from "@/state/ui";
 import { useSong } from "@/song/store";
 import { defaultMix, formatTime, peaks, type Mix, type StemMix } from "@/song/stems/mix";
@@ -174,11 +175,15 @@ export function StemMixer({ stems, songName }: { stems: Record<StemName, PcmAudi
           />
         ))}
       </div>
-      {lastSplit && (
-        <p className="text-[11px] text-silkscreen-3">
-          Split in {lastSplit.seconds.toFixed(1)} s {BACKEND_LABEL[lastSplit.backend]}. Solo a stem to hear it alone; the Tone match tab uses the guitar stem.
+      <div className="flex min-w-0 items-center gap-3">
+        <p className="min-w-0 flex-1 text-[11px] text-pretty text-silkscreen-3">
+          {lastSplit && `Split in ${lastSplit.seconds.toFixed(1)} s ${BACKEND_LABEL[lastSplit.backend]}. `}Solo a stem to hear it alone.
         </p>
-      )}
+        <Button onClick={() => useNav.getState().go("song", "tone")}>
+          <Guitar data-icon="inline-start" />
+          Match the guitar tone
+        </Button>
+      </div>
     </section>
   );
 }

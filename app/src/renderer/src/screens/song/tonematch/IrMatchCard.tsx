@@ -5,7 +5,6 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { notifyError, notifySuccess } from "@/app/notify";
-import { host, isElectron } from "@/host";
 import { cn } from "@/lib/utils";
 import { LocalIrDialog } from "@/screens/tones/T3kDialogs";
 import { useSong } from "@/song/store";
@@ -103,35 +102,24 @@ function Result({ result, playedS }: { result: MatchedIr; playedS: number }) {
     <div className="flex flex-col gap-3">
       <CurvePlot title="Correction between your recording and the song, and the matched IR's response" series={resultSeries(result)} />
       <p className="text-[12px] text-pretty text-silkscreen-3">
-        From {playedS.toFixed(0)} s of playing. A {IR_TAPS}-sample minimum-phase IR at 44.1 kHz, the format the GP-5 loads. It follows the song from {MATCH_LO_HZ} Hz to{" "}
-        {MATCH_HI_HZ / 1000} kHz (at most ±{MAX_CORRECTION_DB} dB) and rolls off like a cabinet outside that. In the CAB block, pick the User IR slot you import it into.
+        From {playedS.toFixed(0)} s of playing. A {IR_TAPS}-sample minimum-phase IR at 44.1 kHz; the GP-5 keeps its first 512 samples (11.6 ms), and a minimum-phase IR puts its energy first. It
+        follows the song from {MATCH_LO_HZ} Hz to {MATCH_HI_HZ / 1000} kHz (at most ±{MAX_CORRECTION_DB} dB) and rolls off like a cabinet outside that. Write it to a User IR slot,
+        then pick that slot in the CAB block.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <Button onClick={() => void save()}>
           <Download data-icon="inline-start" />
           Save WAV…
         </Button>
-        {isElectron && (
-          <Button variant="outline" onClick={send}>
-            <Send data-icon="inline-start" />
-            Send to the GP-5…
-          </Button>
-        )}
+        <Button variant="outline" onClick={send}>
+          <Send data-icon="inline-start" />
+          Write to a User IR slot…
+        </Button>
         <Button variant="ghost" onClick={() => void useIrMatch.getState().open()}>
           <RotateCcw data-icon="inline-start" />
           Record again
         </Button>
       </div>
-      {!isElectron && (
-        <p className="text-[12px] text-pretty text-silkscreen-3">
-          Loading IRs into the GP-5 goes through Valeton Suite (Windows or macOS): save the WAV, import it into a User IR slot in Suite, then reconnect here.
-        </p>
-      )}
-      {isElectron && host.platform === "linux" && (
-        <p className="text-[12px] text-pretty text-silkscreen-3">
-          Valeton Suite does the IR import and runs on Windows and macOS only. On Linux, Tone Studio prepares the file; import it with Suite on another computer.
-        </p>
-      )}
       <LocalIrDialog file={sendFile} onClose={() => setSendFile(null)} />
     </div>
   );
