@@ -14,7 +14,7 @@ import { useNav } from "@/state/nav";
 import { notifyError } from "@/app/notify";
 import { browse, cancelSend, closeSheet, loadAccount, startSendDraft, updateDraft, useTones } from "./store";
 import { CreatorAvatar } from "./ToneCard";
-import { SendSteps, UseOnGp5 } from "./SendSteps";
+import { UserIrSteps, UseOnGp5 } from "./SendSteps";
 import { SnapToneSteps } from "./SnapToneSteps";
 import { ToneImage } from "./ToneImage";
 
@@ -216,14 +216,14 @@ function SheetBody({ toneId, initial }: { toneId: number; initial: T3kTone | nul
               <span className="text-silkscreen-3">Step {stepNo} of 5</span>
             </div>
             {send.text && <p className="text-[12px] text-silkscreen-2">Sends your edited version from the capture editor, made from the selected model.</p>}
-            {isIr ? <SendSteps send={send} model={selected} /> : <SnapToneSteps send={send} model={selected} />}
+            {isIr ? <UserIrSteps send={send} model={selected} /> : <SnapToneSteps send={send} model={selected} />}
           </section>
         )}
       </div>
 
       <SheetFooter className="mt-0 flex-row items-center gap-4 border-t border-border py-3 pr-5 pl-6 text-[11px] [@media(max-height:800px)]:py-2.5">
         <span className="flex-1 text-pretty text-silkscreen-3">
-          {isIr ? "IR upload over USB isn't known yet, so Valeton Suite does the import." : "Tone Studio writes the SnapTone over USB. Valeton Suite isn't needed."}
+          {isIr ? "Tone Studio writes the IR to a User IR slot over USB. Valeton Suite isn't needed." : "Tone Studio writes the SnapTone over USB. Valeton Suite isn't needed."}
         </span>
         {send && send.phase !== "idle" && send.phase !== "linked" && (
           <Button variant="ghost" size="sm" disabled={send.phase === "running" || send.phase === "writing"} onClick={() => cancelSend(toneId)}>

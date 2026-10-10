@@ -25,8 +25,8 @@ export async function writeRecord(tonesDir: string, record: ToneRecord): Promise
 }
 
 /**
- * Merge TONE3000 metadata and (optionally) a downloaded model into the record, keeping links,
- * pending hand-offs and earlier downloads.
+ * Merge TONE3000 metadata and (optionally) a downloaded model into the record, keeping slot links
+ * and earlier downloads.
  */
 export function buildRecord(
   previous: ToneRecord | null,

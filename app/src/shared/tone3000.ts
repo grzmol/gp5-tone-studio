@@ -131,8 +131,3 @@ export function firstEmptySlot(kind: "snaptone" | "ir", slots: { slot: number; n
 
 /** Pedal slot tables mark empty slots by name: "Empty" (SnapTone) or "User IR n" (IR). */
 export const isEmptySlotName = (name: string) => name === "Empty" || name === "" || /^User IR \d+$/.test(name);
-
-/** Slots whose name changed between two reads of the same table. */
-export function changedSlots(before: string[], after: { slot: number; name: string }[], range: [number, number]): number[] {
-  return after.filter((s) => s.slot >= range[0] && s.slot <= range[1] && before[s.slot] !== s.name && !isEmptySlotName(s.name)).map((s) => s.slot);
-}

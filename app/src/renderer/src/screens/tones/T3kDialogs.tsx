@@ -1,18 +1,20 @@
 import { useEffect, useLayoutEffect, useState } from "react";
-import { Cable, Filter, FolderOpen, LogIn, X } from "lucide-react";
+import { Cable, Filter, LogIn, X } from "lucide-react";
 import type { ViewBounds } from "@shared/host/tones";
-import { isEmptySlotName, sanitizeSlotName } from "@shared/tone3000";
+import { firstEmptySlot, sanitizeSlotName } from "@shared/tone3000";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
 import { host } from "@/host";
-import { cn } from "@/lib/utils";
 import { useDevice } from "@/state/device";
 import type { OpenFile } from "@/state/ui";
+import { prepareUserIr, type UserIrFile } from "@/userir/convert";
 import { notifyError, notifySuccess } from "@/app/notify";
-import { closeFlow, closeLinkChoice, closeSplash, continueFromSplash, finishSuite, linkSlot, loadAccount, loadAllCounts, loadList, openSheet, useTones } from "./store";
+import { closeFlow, closeLinkChoice, closeSplash, continueFromSplash, irSlotLabel, linkSlot, loadAccount, loadAllCounts, loadList, openSheet, readSlots, slotLabel, useTones } from "./store";
 import { ToneImage } from "./ToneImage";
+import { irOccupant, irSummary, ReplaceIrNote, UserIrSlotPicker, useIrWriteBlocker } from "./UserIrParts";
 
 /** TONE3000 partnership splash (overlays.html E), before the first sign-in from any entry point. */
 export function SplashDialog() {
@@ -65,8 +67,8 @@ function boundsOf(el: HTMLElement): ViewBounds {
 }
 
 /**
- * The Select / Load Tone flow: TONE3000 renders in a native WebContentsView that main lays over the area of
- * the host element; the dialog frame (title, Close) stays outside it so the app can always cancel.
+ * The sign-in / Select / Load Tone flow: TONE3000 renders in a native WebContentsView that main lays over the
+ * area of the host element; the dialog frame (title, Close) stays outside it so the app can always cancel.
  */
 export function FlowDialog() {
   const open = useTones((s) => s.flowOpen);
@@ -118,7 +120,7 @@ export function FlowDialog() {
     };
   }, [open, req, el]);
 
-  const title = req?.prompt === "load_tone" ? "Sign in to TONE3000" : req?.format === "ir" ? "Browse TONE3000 IRs" : "Browse TONE3000";
+  const title = !req?.prompt || req.prompt === "load_tone" ? "Sign in to TONE3000" : req.format === "ir" ? "Browse TONE3000 IRs" : "Browse TONE3000";
   return (
     <Dialog open={open} onOpenChange={(o) => !o && closeFlow()}>
       <DialogContent
@@ -157,20 +159,19 @@ export function FlowDialog() {
   );
 }
 
-/** Pick the slot Suite used (several or no changes found), or the tone a slot holds (slot context menu). */
+/** Slot context menu: pick the downloaded tone a slot holds. */
 export function LinkDialog() {
   const choice = useTones((s) => s.linkChoice);
   const records = useTones((s) => s.records);
   const snapTones = useDevice((s) => s.snapTones);
   const userIRs = useDevice((s) => s.userIRs);
   const [busy, setBusy] = useState(false);
-  const kindWord = choice?.kind === "ir" ? "User IR" : "SnapTone";
 
-  const link = async (toneId: number, slot: number) => {
+  const link = async (toneId: number) => {
     if (!choice) return;
     setBusy(true);
     try {
-      await linkSlot(toneId, choice.kind, slot);
+      await linkSlot(toneId, choice.kind, choice.slot);
     } catch (e) {
       notifyError("Couldn't link the slot", e);
     } finally {
@@ -178,70 +179,35 @@ export function LinkDialog() {
     }
   };
 
-  let body: React.ReactNode = null;
-  let title = "";
-  let description = "";
-  if (choice?.mode === "slot") {
-    const rec = records[choice.toneId];
-    const table = (choice.kind === "snaptone" ? snapTones?.filter((s) => s.slot >= 50) : userIRs) ?? [];
-    const filled = table.filter((s) => !isEmptySlotName(s.name));
-    title = `Which ${kindWord} slot holds ${rec?.gp5.pending?.fileName ?? rec?.title ?? "it"}?`;
-    description = choice.candidates.length
-      ? `${choice.candidates.length} slots changed while Valeton Suite was open. Pick the one you imported into.`
-      : `Tone Studio didn't find a new ${kindWord} on the pedal. Pick the slot you imported it into, or close this and try again after importing.`;
-    body = (
-      <div className="grid max-h-72 grid-cols-3 gap-1.5 overflow-auto">
-        {filled.map((s) => (
-          <Button
-            key={s.slot}
-            variant={choice.candidates.includes(s.slot) ? "default" : "outline"}
-            size="sm"
-            disabled={busy}
-            className="justify-start"
-            onClick={() => void link(choice.toneId, s.slot)}
-          >
-            <span className="tabular-nums">{s.slot}</span>
-            <span className="truncate">{s.name}</span>
-          </Button>
-        ))}
-        {filled.length === 0 && <p className="col-span-3 text-[12px] text-silkscreen-3">No filled user slots. Read the slots again after importing in Suite.</p>}
-      </div>
-    );
-  } else if (choice?.mode === "tone") {
-    const list = Object.values(records).filter((r) => (choice.kind === "snaptone" ? r.format === "nam" : r.format === "ir"));
-    const slotName = (choice.kind === "snaptone" ? snapTones : userIRs)?.find((s) => s.slot === choice.slot)?.name ?? "";
-    title = `Link ${kindWord} ${choice.slot} ${slotName} to a TONE3000 tone`;
-    description = "Pick the downloaded tone this slot holds. Linking only adds a note in Tone Studio; nothing changes on the pedal.";
-    body = (
-      <ul className="flex max-h-80 flex-col gap-1 overflow-auto">
-        {list.map((r) => (
-          <li key={r.tone_id}>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void link(r.tone_id, choice.slot)}
-              className="flex w-full items-center gap-3 rounded-sm p-1.5 text-left hover:bg-accent disabled:opacity-50"
-            >
-              <ToneImage url={r.image_url} gear={r.gear} format={r.format} alt="" square caption={false} className="w-10 [&_svg]:size-4" />
-              <span className="flex min-w-0 flex-col">
-                <b className="truncate text-[13px] font-semibold">{r.title}</b>
-                <span className="text-[12px] text-silkscreen-3">{r.creator.username}</span>
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    );
-  }
+  const list = choice ? Object.values(records).filter((r) => (choice.kind === "snaptone" ? r.format === "nam" : r.format === "ir")) : [];
+  const slotName = choice ? ((choice.kind === "snaptone" ? snapTones : userIRs)?.find((s) => s.slot === choice.slot)?.name ?? "") : "";
+  const title = choice ? `Link ${slotLabel(choice.kind, choice.slot)} ${slotName} to a TONE3000 tone` : "";
 
   return (
     <Dialog open={choice !== null} onOpenChange={(o) => !o && closeLinkChoice()}>
       <DialogContent className="max-w-[520px]">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          <DialogDescription>Pick the downloaded tone this slot holds. Linking only adds a note in Tone Studio; nothing changes on the pedal.</DialogDescription>
         </DialogHeader>
-        {body}
+        <ul className="flex max-h-80 flex-col gap-1 overflow-auto">
+          {list.map((r) => (
+            <li key={r.tone_id}>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void link(r.tone_id)}
+                className="flex w-full items-center gap-3 rounded-sm p-1.5 text-left hover:bg-accent disabled:opacity-50"
+              >
+                <ToneImage url={r.image_url} gear={r.gear} format={r.format} alt="" square caption={false} className="w-10 [&_svg]:size-4" />
+                <span className="flex min-w-0 flex-col">
+                  <b className="truncate text-[13px] font-semibold">{r.title}</b>
+                  <span className="text-[12px] text-silkscreen-3">{r.creator.username}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
         <DialogFooter>
           <Button variant="ghost" onClick={closeLinkChoice}>
             Cancel
@@ -252,113 +218,105 @@ export function LinkDialog() {
   );
 }
 
-/** A WAV dropped onto the app: check it, put it in the hand-off folder, then Suite does the import. */
+/** Bytes of an opened or dropped file: the File when there is one, else main reads it by path. */
+async function readOpenFile(file: OpenFile): Promise<Uint8Array> {
+  if (file.file) return new Uint8Array(await file.file.arrayBuffer());
+  if (file.path) return host.tones.readLocalIr(file.path);
+  throw new Error(`Couldn't read ${file.name}.`);
+}
+
+/**
+ * A WAV opened, dropped or made by Tone Match: convert it for the GP-5 and write it to the User IR slot the user
+ * picks. The Write button is the confirmation; an occupied slot says what it replaces.
+ */
 export function LocalIrDialog({ file, onClose }: { file: OpenFile | null; onClose: () => void }) {
   const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [slot, setSlot] = useState<number | null>(null);
+  const [ir, setIr] = useState<UserIrFile | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [ready, setReady] = useState<{ path: string; fileName: string } | null>(null);
-  const [before, setBefore] = useState<string[] | null>(null);
+  const [writing, setWriting] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const connected = useDevice((s) => s.status === "connected");
   const userIRs = useDevice((s) => s.userIRs);
-  const linux = host.platform === "linux";
+  const busy = useDevice((s) => s.busy);
+  const blocker = useIrWriteBlocker(slot);
+  const replacing = irOccupant(userIRs, slot);
 
   useEffect(() => {
     if (!file) return;
+    let current = true;
     setName(sanitizeSlotName(file.name.replace(/\.wav$/i, "").toUpperCase()));
-    setReady(null);
+    setSlot(null);
+    setIr(null);
     setError(null);
-    setBefore(null);
+    setProgress(0);
+    readOpenFile(file)
+      .then((bytes) => current && setIr(prepareUserIr(bytes)))
+      .catch((e) => current && setError(e instanceof Error ? e.message : String(e)));
+    return () => {
+      current = false;
+    };
   }, [file]);
 
-  // After Suite: report which User IR slot changed (local files have no TONE3000 link).
+  // The slot list comes from the pedal; propose the first empty slot once it is known.
   useEffect(() => {
-    if (!before || !userIRs || !ready) return;
-    const changed = userIRs.filter((s) => before[s.slot] !== undefined && before[s.slot] !== s.name && !isEmptySlotName(s.name));
-    if (changed.length === 1) {
-      notifySuccess(`${ready.fileName} is in User IR slot ${changed[0].slot}`, `The pedal calls it ${changed[0].name}.`);
-      onClose();
-    }
-  }, [userIRs, before, ready, onClose]);
+    if (file && connected && !userIRs && !busy) void readSlots();
+  }, [file, connected, userIRs, busy]);
+  useEffect(() => {
+    if (file && slot === null && userIRs) setSlot(firstEmptySlot("ir", userIRs));
+  }, [file, slot, userIRs]);
 
-  const prepare = async () => {
-    if (!file) return;
-    setBusy(true);
+  const write = async () => {
+    if (!file || !ir || slot === null) return;
+    setWriting(true);
     setError(null);
+    setProgress(0);
     try {
-      const bytes = file.path ? null : file.file ? new Uint8Array(await file.file.arrayBuffer()) : null;
-      setReady(await host.tones.prepareLocalIr({ path: file.path, bytes, name }));
+      const stored = await useDevice.getState().uploadUserIr(slot, name, ir.data, { onProgress: setProgress });
+      notifySuccess(`Wrote ${irSlotLabel(slot)} on your GP-5`, `${file.name} is in the slot as ${stored}.`);
+      onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setBusy(false);
-    }
-  };
-  const openSuite = async () => {
-    const d = useDevice.getState();
-    try {
-      const table = d.status === "connected" ? (d.userIRs ?? (await d.readUserIRs())) : d.userIRs;
-      if (table) setBefore(Array.from({ length: 20 }, (_, i) => table.find((s) => s.slot === i)?.name ?? ""));
-      await host.tones.openSuite();
-      if (d.status === "connected") {
-        useTones.setState({ pausedMode: d.mode });
-        await d.disconnect();
-      }
-    } catch (e) {
-      notifyError("Couldn't open Valeton Suite", e);
+      setWriting(false);
     }
   };
 
+  const slotText = slot === null ? "a User IR slot" : irSlotLabel(slot);
   return (
-    <Dialog open={file !== null} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={file !== null} onOpenChange={(o) => !o && !writing && onClose()}>
       <DialogContent className="max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>Send {file?.name} to a User IR slot</DialogTitle>
-          <DialogDescription>
-            {ready
-              ? linux
-                ? `Valeton Suite runs on Windows and macOS. Copy ${ready.fileName} to a computer with Suite, import it, then reconnect the pedal here.`
-                : `Valeton Suite does the import. Import ${ready.fileName} into a free User IR slot, then close Suite. Tone Studio lets go of the USB connection while Suite is open.`
-              : "Tone Studio checks the WAV and puts it in the Ready for Valeton Suite folder."}
-          </DialogDescription>
+          <DialogTitle>Write {file?.name} to a User IR slot</DialogTitle>
+          <DialogDescription>Tone Studio converts the WAV for the GP-5 and writes it over USB. Nothing changes on the pedal until you press Write.</DialogDescription>
         </DialogHeader>
-        {!ready && (
-          <label className="flex items-center gap-2 text-[12px] text-silkscreen-2">
-            Name on the pedal
-            <Input value={name} maxLength={10} onChange={(e) => setName(sanitizeSlotName(e.target.value.toUpperCase()))} className="h-8 w-36" />
+        <div className="flex flex-col gap-3 text-[12px]">
+          {ir ? <p className="text-pretty text-silkscreen-3">{irSummary(ir)}</p> : !error && <Spinner aria-label="Checking the file" />}
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 text-silkscreen-2">
+              Name on the pedal
+              <Input value={name} maxLength={10} disabled={writing} onChange={(e) => setName(sanitizeSlotName(e.target.value.toUpperCase()))} className="h-8 w-36" />
+            </label>
             <span className="text-[11px] text-silkscreen-3">{name.length}/10</span>
-          </label>
-        )}
-        {error && (
-          <p role="alert" className="text-[12px] text-led-fault">
-            {error}
-          </p>
-        )}
-        <DialogFooter className={cn(ready && "sm:justify-between")}>
-          {ready ? (
-            <>
-              <Button variant="ghost" onClick={() => host.app.showItemInFolder(ready.path).catch((e) => notifyError("Couldn't show the file", e))}>
-                <FolderOpen data-icon="inline-start" />
-                Show file
-              </Button>
-              {before ? (
-                <Button onClick={() => void finishSuite()}>Find it on the pedal</Button>
-              ) : linux ? (
-                <Button onClick={onClose}>Done</Button>
-              ) : (
-                <Button onClick={() => void openSuite()}>Open Valeton Suite</Button>
-              )}
-            </>
-          ) : (
-            <>
-              <Button variant="ghost" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button disabled={!name || busy} onClick={() => void prepare()}>
-                {busy && <Spinner data-icon="inline-start" />}
-                Prepare for Valeton Suite
-              </Button>
-            </>
+            <UserIrSlotPicker value={slot} onChange={setSlot} disabled={writing} />
+          </div>
+          {replacing && !writing && <ReplaceIrNote name={replacing} />}
+          {writing && <Progress value={progress * 100} className="w-56" aria-label="User IR write progress" />}
+          {error && (
+            <p role="alert" className="text-pretty text-led-fault">
+              {error}
+            </p>
           )}
+          {blocker && !writing && <p className="text-[11px] text-silkscreen-3">{blocker}</p>}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" disabled={writing} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button disabled={!ir || !name || writing || blocker !== null} onClick={() => void write()}>
+            {writing && <Spinner data-icon="inline-start" />}
+            {replacing ? `Replace ${replacing} in ${slotText}` : `Write to ${slotText}`}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

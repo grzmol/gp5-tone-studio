@@ -3,7 +3,7 @@ import type { AppEvent } from "../ipc";
 export interface AppSettings {
   /** Show knob values printed under the labels on gear art. */
   showValues: boolean;
-  /** Path to Valeton Suite (for "Open Valeton Suite"); null = not configured. */
+  /** Path to Valeton Suite (Windows .exe / macOS .app), where the SnapTone test signal is found; null = not configured. */
   valetonSuitePath: string | null;
   /** MIDI port name pattern override (advanced). */
   portPattern: string | null;

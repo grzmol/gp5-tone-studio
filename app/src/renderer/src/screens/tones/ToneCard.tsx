@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { requestImage, useTones } from "./store";
+import { irSlotLabel, requestImage, useTones } from "./store";
 import { ToneImage } from "./ToneImage";
 
 export function CreatorAvatar({ username, url, className }: { username: string; url: string | null; className?: string }) {
@@ -27,14 +27,14 @@ export function CreatorAvatar({ username, url, className }: { username: string; 
 /** Linked beats every other verdict: the tone is already on the pedal. */
 export function linkLabel(record: ToneRecord | undefined): string | null {
   if (record?.gp5.snaptoneSlot !== undefined) return `Linked to SnapTone ${record.gp5.snaptoneSlot}`;
-  if (record?.gp5.irSlot !== undefined) return `Linked to User IR ${record.gp5.irSlot}`;
+  if (record?.gp5.irSlot !== undefined) return `Linked to ${irSlotLabel(record.gp5.irSlot)}`;
   return null;
 }
 
 const REASON: Record<string, string> = {
   ready: "This tone has NAM A1 or A2 models. Tone Studio turns them into GP-5 SnapTones the way Valeton Suite does.",
   reshape: "The A1 file is in NAM 0.7 format. Tone Studio converts it to the 0.5 layout Valeton Suite imports, without changing the sound.",
-  ir: "IRs go to one of the GP-5's 20 User IR slots through Valeton Suite.",
+  ir: "Tone Studio writes IRs over USB to one of the GP-5's 20 User IR slots. The pedal keeps the first 11.6 ms.",
   custom: "This tone uses a custom NAM layout. Tone Studio can't turn it into a SnapTone.",
   format: "The GP-5 takes SnapTones made from NAM captures, and WAV IRs.",
 };

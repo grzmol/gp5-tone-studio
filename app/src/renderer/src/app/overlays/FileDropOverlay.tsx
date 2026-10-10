@@ -8,7 +8,8 @@ import { notifyError } from "../notify";
 const hasFiles = (e: DragEvent) => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files");
 
 /**
- * Window-wide drop target (electron.md › Files): .prst → Library, .nam → capture editor, .wav → Tones, other audio
+ * Window-wide drop target (electron.md › Files): .prst → Library, .nam → capture editor, .wav → Tones (to write a User
+ * IR slot), other audio
  * (mp3, flac …) → Song. On the Song screen a .wav is a song too (its handler wins while it is mounted).
  * Screens with their own drop zones (Library panes) handle the drop first and call preventDefault;
  * only unclaimed drops reach this listener. The overlay is a visual hint and never blocks those zones.
@@ -71,7 +72,7 @@ export function FileDropOverlay() {
           <span className="text-xs text-silkscreen-2">
             {screen === "song"
               ? "Songs (WAV, MP3, FLAC, M4A, OGG) are split into stems here"
-              : "Presets (.prst) go to the Library, NAM captures to the capture editor, IRs (.wav) to Tones, songs to Song"}
+              : "Presets (.prst) go to the Library, NAM captures to the capture editor, IRs (.wav) to a User IR slot, songs to Song"}
           </span>
         </div>
       </div>

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { a2WeightCount, A2_DILATIONS, A2_KERNEL_SIZES, assertWav, checkNam, NamCheckError, prepareNam, selectA2 } from "./nam";
-import { changedSlots, firstEmptySlot, gp5Models, modelsVerdict, proposeSlotName, sanitizeSlotName, toneVerdict } from "./tone3000";
+import { firstEmptySlot, gp5Models, modelsVerdict, proposeSlotName, sanitizeSlotName, toneVerdict } from "./tone3000";
 
 const DIL = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512];
 const weights = [0.1, -0.2, 0.3, 0.02];
@@ -213,12 +213,9 @@ describe("slot helpers", () => {
     expect(name).toMatch(/^5150III/);
     expect(name.endsWith("4")).toBe(true);
   });
-  it("finds the first empty user slot and the slots Suite changed", () => {
+  it("finds the first empty user slot", () => {
     const slots = Array.from({ length: 80 }, (_, i) => ({ slot: i, name: i < 50 ? `Factory ${i}` : i < 58 ? `S${i}` : "Empty" }));
     expect(firstEmptySlot("snaptone", slots)).toBe(58);
-    const before = slots.map((s) => s.name);
-    const after = slots.map((s) => (s.slot === 58 ? { ...s, name: "5150-RED4" } : s));
-    expect(changedSlots(before, after, [50, 79])).toEqual([58]);
     expect(firstEmptySlot("ir", [{ slot: 0, name: "A7X" }, { slot: 1, name: "User IR 2" }])).toBe(1);
   });
 });

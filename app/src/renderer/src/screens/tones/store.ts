@@ -1,15 +1,13 @@
-import { useEffect } from "react";
 import { create } from "zustand";
-import type { AccountState, FlowRequest, NamCheck, SendResult, T3kTone, ToneListKind, ToneRecord } from "@shared/host/tones";
+import type { AccountState, FlowRequest, NamCheck, SendStep, T3kTone, ToneListKind, ToneRecord } from "@shared/host/tones";
 import { HostError } from "@shared/ipc";
-import { changedSlots, firstEmptySlot } from "@shared/tone3000";
+import { firstEmptySlot } from "@shared/tone3000";
 import { host } from "@/host";
 import { useDevice } from "@/state/device";
-import { useNav } from "@/state/nav";
 import { notifySuccess } from "@/app/notify";
-import type { DeviceMode, SlotName } from "@/state/device-types";
 import type { PresetRef } from "./usage";
 import { convertToSnapTone } from "@/snaptone/convert";
+import { prepareUserIr, type UserIrFile } from "@/userir/convert";
 
 export interface ListState {
   tones: T3kTone[];
@@ -22,8 +20,8 @@ export interface ListState {
   loaded: boolean;
 }
 
-/** "converting" and "writing" are SnapTone-only; "suite" and "linking" are the IR hand-off to Valeton Suite. */
-export type SendPhase = "idle" | "running" | "converting" | "ready" | "writing" | "suite" | "linking" | "linked" | "error";
+/** "converting" is SnapTone-only; "ready" waits for the write (IR: for the user to pick the slot and press Write). */
+export type SendPhase = "idle" | "running" | "converting" | "ready" | "writing" | "linked" | "error";
 
 export interface SendState {
   toneId: number;
@@ -31,35 +29,31 @@ export interface SendState {
   name: string;
   kind: "snaptone" | "ir";
   phase: SendPhase;
-  /** SnapTone: 1 download, 2 check, 3 convert, 4 write, 5 linked. IR: 1 download, 2 check, 3 save, 4 Suite, 5 link */
+  /** SnapTone: 1 download, 2 check, 3 convert, 4 write, 5 linked. IR: 1 download, 2 check and convert, 3 slot, 4 write, 5 linked */
   step: 1 | 2 | 3 | 4 | 5;
   received: number;
   total: number | null;
-  /** Fraction of the SnapTone conversion or write */
+  /** Fraction of the SnapTone conversion or of the write */
   progress: number;
   error: string | null;
-  /** IR hand-off file */
-  result: SendResult | null;
   /** SnapTone: the checked NAM file */
   check: NamCheck | null;
   /** SnapTone: the converted 2696-byte file, kept for retrying the write */
   file: Uint8Array | null;
-  /** Target slot: SnapTone 50–79 (chosen by the user), IR the free slot Suite should use */
+  /** IR: the converted 2048-byte User IR block and what was cut, kept for retrying the write */
+  ir: UserIrFile | null;
+  /** Target slot chosen by the user: SnapTone 50–79, User IR 0–19 (shown as User IR 1–20) */
   proposedSlot: number | null;
-  /** Suite launch could be watched (process exit is reported) */
-  watched: boolean;
   linkedSlot: number | null;
   /** Edited .nam text from the capture editor, used instead of the download */
   text: string | null;
 }
 
-/**
- * Link dialog: after Suite, pick which slot holds the tone ("slot"; candidates = slots that changed, empty
- * when none was detected), or from a slot's context menu, pick which downloaded tone it holds ("tone").
- */
-export type LinkChoice =
-  | { mode: "slot"; toneId: number; kind: "snaptone" | "ir"; candidates: number[] }
-  | { mode: "tone"; kind: "snaptone" | "ir"; slot: number };
+/** Slot context menu: pick which downloaded tone a slot holds. */
+export interface LinkChoice {
+  kind: "snaptone" | "ir";
+  slot: number;
+}
 
 export interface UsageInfo {
   presets: (PresetRef & { prst: Uint8Array })[];
@@ -85,11 +79,8 @@ interface TonesState {
   slotsReadAt: number | null;
   slotsError: string | null;
   usage: UsageInfo | null;
-  suiteRunning: boolean;
   send: Record<number, SendState>;
   linkChoice: LinkChoice | null;
-  /** Mode to reconnect in after Valeton Suite */
-  pausedMode: DeviceMode | null;
 }
 
 const empty = (): ListState => ({ tones: [], page: 0, totalPages: 1, total: 0, fetchedAt: 0, loading: false, error: null, loaded: false });
@@ -97,7 +88,7 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export const useTones = create<TonesState>(() => ({
   account: null,
-  tab: "favorited",
+  tab: "trending",
   format: "all",
   compatOnly: false,
   lists: {},
@@ -110,10 +101,8 @@ export const useTones = create<TonesState>(() => ({
   slotsReadAt: null,
   slotsError: null,
   usage: null,
-  suiteRunning: false,
   send: {},
   linkChoice: null,
-  pausedMode: null,
 }));
 
 const set = useTones.setState;
@@ -144,32 +133,20 @@ export async function loadAccount(): Promise<void> {
     set({ account });
     if (account.status !== "signed-in") set({ lists: {} });
   } catch (e) {
-    set({ account: { status: "signed-out", user: null, configured: false, splashSeen: true } });
+    set({ account: { status: "signed-out", user: null, configured: false, appKey: null, splashSeen: true } });
     console.warn("TONE3000 account", e);
   }
 }
 
-let recordsLoad: Promise<void> | null = null;
-export function loadRecords(): Promise<void> {
-  recordsLoad = host.tones
-    .local()
-    .catch(() => [])
-    .then((list) => set({ records: Object.fromEntries(list.map((r) => [r.tone_id, r])) }));
-  return recordsLoad;
+export async function loadRecords(): Promise<void> {
+  const list = await host.tones.local().catch(() => []);
+  set({ records: Object.fromEntries(list.map((r) => [r.tone_id, r])) });
 }
 
-/**
- * The TONE3000 tone linked to a pedal slot (Rig's NS/CAB blocks show its image, title, creator: TONE3000
- * requirement 5). Undefined when the slot isn't linked. Loads the local records once.
- */
-export function useLinkedTone(kind: "snaptone" | "ir", slot: number | null): ToneRecord | undefined {
-  useEffect(() => {
-    if (!recordsLoad) void loadRecords();
-  }, []);
-  return useTones((s) =>
-    slot === null ? undefined : Object.values(s.records).find((r) => (kind === "snaptone" ? r.gp5.snaptoneSlot === slot : r.gp5.irSlot === slot)),
-  );
-}
+/** User IR slots are 0-based on the wire and 1-based on the pedal and in Valeton Suite ("User IR 1" = slot 0). */
+export const irSlotLabel = (slot: number) => `User IR ${slot + 1}`;
+
+export const slotLabel = (kind: "snaptone" | "ir", slot: number) => (kind === "ir" ? irSlotLabel(slot) : `SnapTone slot ${slot}`);
 
 function storeRecord(r: ToneRecord) {
   set((s) => ({ records: { ...s.records, [r.tone_id]: r } }));
@@ -222,17 +199,9 @@ export async function browse(req: FlowRequest = { prompt: "select_tone" }): Prom
   else set({ flowOpen: true });
 }
 
-/**
- * Entry point from a signal block (TONE3000 requirement 1): Rig › NS "Browse TONE3000 captures" or
- * Rig › CAB "Browse TONE3000 IRs". Opens Tones with the Select flow scoped to what that block can load.
- */
-export function browseForBlock(kind: "capture" | "ir"): void {
-  useNav.getState().go("tones");
-  void browse(
-    kind === "capture"
-      ? { prompt: "select_tone", format: "nam", gears: "amp_amp-cab_pedal" }
-      : { prompt: "select_tone", format: "ir", gears: "cab" },
-  );
+/** Plain sign-in: authorize without a prompt, so TONE3000 returns right after login instead of asking for a tone. */
+export function signIn(): Promise<void> {
+  return browse({});
 }
 
 export function continueFromSplash(): void {
@@ -254,6 +223,12 @@ export async function signOut(): Promise<void> {
   await loadAccount();
 }
 
+/** Save the TONE3000 app key from Settings; a different key signs out, so the lists go too. */
+export async function setAppKey(appKey: string | null): Promise<void> {
+  const account = await host.tones.setAppKey(appKey);
+  set({ account, lists: {} });
+}
+
 // ---------------------------------------------------------------------------------- sheet
 
 export function openSheet(toneId: number, tone: T3kTone | null = null): void {
@@ -273,17 +248,8 @@ export async function readSlots(): Promise<void> {
     await d.readSnapTones();
     await d.readUserIRs();
     set({ slotsReadAt: Date.now(), slotsError: null });
-    detectPendingLinks();
   } catch (e) {
     set({ slotsError: message(e) });
-  }
-}
-
-/** On each slot read, link pending hand-offs whose new slot is unambiguous (stale links show in the slot map). */
-function detectPendingLinks(): void {
-  const d = useDevice.getState();
-  for (const r of Object.values(get().records)) {
-    if (r.gp5.pending && r.gp5.pending.before) void detectSent(r.tone_id, d.snapTones, d.userIRs, true);
   }
 }
 
@@ -328,11 +294,10 @@ export function startSendDraft(toneId: number, modelId: number, name: string, ki
         total: null,
         progress: 0,
         error: null,
-        result: null,
         check: null,
         file: null,
+        ir: null,
         proposedSlot: firstEmptySlot(kind, kind === "snaptone" ? d.snapTones : d.userIRs),
-        watched: false,
         linkedSlot: null,
         text: opts.text ?? null,
       },
@@ -348,8 +313,6 @@ export function updateDraft(toneId: number, patch: Partial<Pick<SendState, "mode
 const conversions = new Map<number, AbortController>();
 
 export function cancelSend(toneId: number): void {
-  const s = get().send[toneId];
-  if (s?.result) void host.tones.setPending(toneId, null).then(storeRecord).catch(() => {});
   conversions.get(toneId)?.abort();
   set((st) => {
     const next = { ...st.send };
@@ -365,7 +328,8 @@ function sendError(toneId: number, e: unknown): void {
 
 /**
  * SnapTone: download and check in main, convert in a worker, then write the slot when the pedal is connected
- * and a slot is chosen (otherwise it waits in "ready"). IR: download, check, save to the Suite hand-off folder.
+ * and a slot is chosen (otherwise it waits in "ready"). IR: download and check in main, convert here, then wait
+ * in "ready" until the user picks the slot and writes it (the converted IR says what the pedal keeps).
  */
 export async function runSend(toneId: number): Promise<void> {
   const s = get().send[toneId];
@@ -374,9 +338,10 @@ export async function runSend(toneId: number): Promise<void> {
   const req = { toneId, modelId: s.modelId, name: s.name, text: s.text ?? undefined };
   if (s.kind === "ir") {
     try {
-      const result = await host.tones.prepareForSuite(req);
-      storeRecord(result.record);
-      patchSend(toneId, { phase: "ready", step: 4, result });
+      const source = await host.tones.prepareIr(req);
+      storeRecord(source.record);
+      patchSend(toneId, { step: 2 });
+      patchSend(toneId, { phase: "ready", step: 3, ir: prepareUserIr(source.wav) });
     } catch (e) {
       sendError(toneId, e);
     }
@@ -410,87 +375,34 @@ export async function writeSnapTone(toneId: number): Promise<void> {
     const rec = await host.tones.link(toneId, { kind: "snaptone", slot, slotName: stored });
     storeRecord(rec);
     patchSend(toneId, { phase: "linked", step: 5, linkedSlot: slot });
-    notifySuccess(`Wrote SnapTone slot ${slot} on your GP-5`, rec.title);
+    notifySuccess(`Wrote ${slotLabel("snaptone", slot)} on your GP-5`, rec.title);
+  } catch (e) {
+    patchSend(toneId, { phase: "error", error: message(e) });
+  }
+}
+
+/** IR step 4: write the converted IR to the chosen User IR slot, then link the slot to the tone. */
+export async function writeUserIr(toneId: number): Promise<void> {
+  const s = get().send[toneId];
+  if (!s?.ir || s.proposedSlot === null) return;
+  const slot = s.proposedSlot;
+  patchSend(toneId, { phase: "writing", step: 4, error: null, progress: 0 });
+  try {
+    const stored = await useDevice.getState().uploadUserIr(slot, s.name, s.ir.data, { onProgress: (progress) => patchSend(toneId, { progress }) });
+    const rec = await host.tones.link(toneId, { kind: "ir", slot, slotName: stored });
+    storeRecord(rec);
+    patchSend(toneId, { phase: "linked", step: 5, linkedSlot: slot });
+    notifySuccess(`Wrote ${irSlotLabel(slot)} on your GP-5`, rec.title);
   } catch (e) {
     patchSend(toneId, { phase: "error", error: message(e) });
   }
 }
 
 /** Progress events from main move the stepper. */
-export function onSendProgress(toneId: number, step: "download" | "check" | "save", received: number, total: number | null): void {
+export function onSendProgress(toneId: number, step: SendStep, received: number, total: number | null): void {
   const s = get().send[toneId];
   if (!s || s.phase !== "running") return;
-  patchSend(toneId, { step: step === "download" ? 1 : step === "check" ? 2 : 3, received, total });
-}
-
-/**
- * Step 4: remember the slot table, let go of the USB port (Suite needs it exclusively on Windows),
- * then launch Suite. Nothing is written to the pedal by Tone Studio.
- */
-export async function openSuite(toneId: number): Promise<void> {
-  const s = get().send[toneId];
-  if (!s?.result) return;
-  const d = useDevice.getState();
-  let table: SlotName[] | null = s.kind === "snaptone" ? d.snapTones : d.userIRs;
-  if (d.status === "connected" && !table) table = await (s.kind === "snaptone" ? d.readSnapTones() : d.readUserIRs()).catch(() => null);
-  const before = table ? slotNames(table, s.kind === "snaptone" ? 80 : 20) : null;
-  const rec = await host.tones.setPending(toneId, {
-    kind: s.kind,
-    fileName: s.result.fileName,
-    path: s.result.path,
-    proposedSlot: s.proposedSlot,
-    before,
-    at: new Date().toISOString(),
-  });
-  storeRecord(rec);
-  const launch = await host.tones.openSuite();
-  if (d.status === "connected") {
-    set({ pausedMode: d.mode });
-    await d.disconnect();
-  }
-  patchSend(toneId, { phase: "suite", step: 5, watched: launch.watched });
-}
-
-function slotNames(table: SlotName[], count: number): string[] {
-  const out = Array<string>(count).fill("");
-  for (const s of table) if (s.slot < count) out[s.slot] = s.name;
-  return out;
-}
-
-/** Suite exited (or the user says it's done): reconnect, read the slot table, link the new slot. */
-export async function finishSuite(toneId?: number): Promise<void> {
-  set({ suiteRunning: false });
-  const d = useDevice.getState();
-  if (d.status !== "connected") {
-    try {
-      await d.connect(get().pausedMode ?? d.mode);
-    } catch {
-      /* the device chip reports connection problems; the link step waits for the pedal */
-    }
-  }
-  set({ pausedMode: null });
-  const now = useDevice.getState();
-  if (now.status !== "connected") return;
-  const snap = await now.readSnapTones().catch(() => null);
-  const irs = await now.readUserIRs().catch(() => null);
-  set({ slotsReadAt: Date.now() });
-  const ids = toneId !== undefined ? [toneId] : Object.values(get().records).filter((r) => r.gp5.pending).map((r) => r.tone_id);
-  for (const id of ids) await detectSent(id, snap, irs, false);
-}
-
-/** Diff the slot table against the one read before Suite opened. One change links; otherwise ask. */
-async function detectSent(toneId: number, snap: SlotName[] | null, irs: SlotName[] | null, quiet: boolean): Promise<void> {
-  const rec = get().records[toneId];
-  const pending = rec?.gp5.pending;
-  if (!pending) return;
-  const table = pending.kind === "snaptone" ? snap : irs;
-  if (!table) return;
-  const changed = pending.before ? changedSlots(pending.before, table, pending.kind === "snaptone" ? [50, 79] : [0, 19]) : [];
-  if (changed.length === 1) {
-    await linkSlot(toneId, pending.kind, changed[0]);
-    return;
-  }
-  if (!quiet) set({ linkChoice: { mode: "slot", toneId, kind: pending.kind, candidates: changed } });
+  patchSend(toneId, { step: step === "download" ? 1 : 2, received, total });
 }
 
 export async function linkSlot(toneId: number, kind: "snaptone" | "ir", slot: number): Promise<ToneRecord> {
@@ -501,7 +413,7 @@ export async function linkSlot(toneId: number, kind: "snaptone" | "ir", slot: nu
   storeRecord(rec);
   patchSend(toneId, { phase: "linked", linkedSlot: slot });
   set({ linkChoice: null });
-  notifySuccess(`Linked to ${kind === "snaptone" ? "SnapTone" : "User IR"} slot ${slot} on your GP-5`, rec.title);
+  notifySuccess(`Linked to ${slotLabel(kind, slot)} on your GP-5`, rec.title);
   return rec;
 }
 

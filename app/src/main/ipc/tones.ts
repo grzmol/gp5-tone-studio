@@ -1,15 +1,12 @@
-import { app, BrowserWindow, dialog, nativeImage, net, safeStorage, shell } from "electron";
-import { spawn } from "node:child_process";
+import { app, BrowserWindow, nativeImage, net, safeStorage } from "electron";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { basename, extname, join } from "node:path";
 import { HostError } from "@shared/ipc";
-import type { AccountState, FlowRequest, FlowResult, LocalIrRequest, SendRequest, SnapToneSource, T3kModel, T3kTone, T3kUser, TonePage, ToneRecord, TonesEvent, ToneListKind, ViewBounds } from "@shared/host/tones";
-import { sanitizeSlotName } from "@shared/tone3000";
+import type { AccountState, FlowRequest, FlowResult, SendRequest, SnapToneSource, T3kModel, T3kTone, T3kUser, TonePage, ToneRecord, TonesEvent, ToneListKind, UserIrSource, ViewBounds } from "@shared/host/tones";
 import { assertWav, NamCheckError, prepareNam } from "@shared/nam";
 import { handle } from "./handle";
-import { loadSettings } from "./app";
 import { postToken, T3kClient } from "../tone3000/api";
 import { TokenManager, type TokenSet, type TokenStore } from "../tone3000/tokens";
 import { cancelFlow, runFlow, setFlowBounds } from "../tone3000/oauth";
@@ -28,11 +25,14 @@ declare global {
 
 const DEFAULT_REDIRECT = "http://localhost:3001/callback";
 const LIST_TTL = 10 * 60_000;
+/** Printable ASCII without spaces; client_ids are opaque tokens. */
+const APP_KEY = /^[\x21-\x7e]{1,256}$/;
+/** Opened WAVs are read whole; real IRs are a few hundred KB, so anything this big isn't one. */
+const MAX_LOCAL_IR = 64 * 1024 * 1024;
 
 const userData = () => app.getPath("userData");
 const tonesDir = () => join(userData(), "tones");
 const cacheDir = () => join(userData(), "tone-cache");
-const handoffDir = () => join(userData(), "ready-for-suite");
 const statePath = () => join(userData(), "tone3000.json");
 const tokenPath = () => join(userData(), "t3k-tokens.enc");
 
@@ -114,14 +114,33 @@ async function account(): Promise<AccountState> {
     status: signedIn ? "signed-in" : tokens.expired ? "expired" : "signed-out",
     user: signedIn ? (s.user ?? (await fetchUser())) : null,
     configured: Boolean(clientId),
+    appKey: s.clientId || null,
     splashSeen: Boolean(s.splashSeen),
   };
+}
+
+async function dropSession(): Promise<void> {
+  await tokens.clear();
+  tokens.expired = false;
+  listCache.clear();
+  await patchState({ user: null });
+}
+
+/** Tokens belong to the client_id that issued them, so switching the effective key signs out. */
+async function setAppKey(value: unknown): Promise<AccountState> {
+  if (value !== null && typeof value !== "string") throw new HostError("invalid", "The TONE3000 app key must be text");
+  const next = value?.trim() || undefined;
+  if (next && !APP_KEY.test(next)) throw new HostError("invalid", "A TONE3000 app key has no spaces and is at most 256 characters");
+  const before = (await config()).clientId;
+  await patchState({ clientId: next });
+  if ((await config()).clientId !== before) await dropSession();
+  return account();
 }
 
 async function beginFlow(win: BrowserWindow, req: FlowRequest, bounds: ViewBounds): Promise<FlowResult> {
   const { clientId, redirectUri } = await config();
   if (!clientId)
-    return { status: "error", message: "This build has no TONE3000 app key. Set MAIN_VITE_T3K_CLIENT_ID when building, or add a clientId to tone3000.json in the app data folder." };
+    return { status: "error", message: "No TONE3000 app key is set. Enter one in Settings › TONE3000 account." };
   const raw = await runFlow(win, clientId, redirectUri, req, bounds);
   if (raw.status !== "code") return raw;
   try {
@@ -225,17 +244,11 @@ async function recordSent(dl: DownloadedModel, reshaped: boolean | undefined): P
   return writeRecord(tonesDir(), buildRecord(prev, dl.tone, dl.models, { model: dl.model, file: basename(dl.path), bytes: dl.bytes, reshaped }, new Date()));
 }
 
-async function prepareForSuite(getWindow: () => BrowserWindow | null, req: SendRequest) {
-  const name = sanitizeSlotName(req.name);
-  if (!name) throw new HostError("invalid", "Give the capture a name (letters and digits, up to 10 characters)");
-  const { dl, isIr, out, check } = await downloadAndCheck(getWindow, req);
-  emit(getWindow, { type: "progress", toneId: req.toneId, modelId: req.modelId, step: "save", received: 0, total: null });
-  const fileName = `${name}.${isIr ? "wav" : "nam"}`;
-  await mkdir(handoffDir(), { recursive: true });
-  const path = join(handoffDir(), fileName);
-  await writeFile(path, out);
-  const record = await recordSent(dl, check?.reshaped);
-  return { path, fileName, bytes: dl.bytes, check, record };
+/** IR send steps 1–2: download the WAV and check it is one; the renderer converts it and writes the slot. */
+async function prepareIr(getWindow: () => BrowserWindow | null, req: SendRequest): Promise<UserIrSource> {
+  const { dl, isIr, out } = await downloadAndCheck(getWindow, req);
+  if (!isIr) throw new HostError("invalid", "This tone is a NAM capture, not an impulse response");
+  return { wav: new Uint8Array(out as Buffer), record: await recordSent(dl, undefined) };
 }
 
 async function prepareSnapTone(getWindow: () => BrowserWindow | null, req: SendRequest): Promise<SnapToneSource> {
@@ -250,33 +263,6 @@ async function updateRecord(toneId: number, fn: (r: ToneRecord) => ToneRecord): 
   return writeRecord(tonesDir(), fn(rec));
 }
 
-async function openSuite(getWindow: () => BrowserWindow | null): Promise<{ watched: boolean }> {
-  if (process.platform === "linux")
-    throw new HostError("unsupported", "Valeton Suite runs on Windows and macOS. Copy the file to a computer with Suite, import it, then reconnect the pedal here.");
-  const path = (await loadSettings()).valetonSuitePath;
-  if (!path) throw new HostError("not-found", "Choose where Valeton Suite is installed first.");
-  if (!existsSync(path)) throw new HostError("not-found", `Valeton Suite isn't at ${path} anymore. Choose its location again.`);
-  const watch = (cmd: string, args: string[]) => {
-    const child = spawn(cmd, args, { detached: true, stdio: "ignore" });
-    emit(getWindow, { type: "suite", running: true });
-    child.once("exit", () => emit(getWindow, { type: "suite", running: false }));
-    child.once("error", () => emit(getWindow, { type: "suite", running: false }));
-    child.unref();
-  };
-  // macOS: `open -W` returns when the app quits. Windows: watch the .exe process directly.
-  if (process.platform === "darwin") {
-    watch("open", ["-W", path]);
-    return { watched: true };
-  }
-  if (/\.exe$/i.test(path)) {
-    watch(path, []);
-    return { watched: true };
-  }
-  const err = await shell.openPath(path);
-  if (err) throw new HostError("io", err);
-  return { watched: false };
-}
-
 export function registerTonesIpc(getWindow: () => BrowserWindow | null): void {
   handle("tones:account", () => account());
   handle("tones:markSplashSeen", () => patchState({ splashSeen: true }));
@@ -287,12 +273,8 @@ export function registerTonesIpc(getWindow: () => BrowserWindow | null): void {
   });
   handle("tones:setFlowBounds", (_e, bounds: ViewBounds) => setFlowBounds(bounds));
   handle("tones:cancelFlow", () => cancelFlow());
-  handle("tones:signOut", async () => {
-    await tokens.clear();
-    tokens.expired = false;
-    listCache.clear();
-    await patchState({ user: null });
-  });
+  handle("tones:signOut", () => dropSession());
+  handle("tones:setAppKey", (_e, appKey: unknown) => setAppKey(appKey));
   handle("tones:list", (_e, kind: ToneListKind, page: number, refresh?: boolean) => list(kind, page, refresh));
   handle("tones:tone", (_e, id: number): Promise<T3kTone> => client.tone(id));
   handle("tones:models", (_e, toneId: number): Promise<T3kModel[]> => client.models(toneId));
@@ -301,30 +283,19 @@ export function registerTonesIpc(getWindow: () => BrowserWindow | null): void {
     const { path, bytes, record } = await downloadModel(getWindow, toneId, modelId);
     return { path, bytes, record };
   });
-  handle("tones:prepareForSuite", (_e, req: SendRequest) => prepareForSuite(getWindow, req));
+  handle("tones:prepareIr", (_e, req: SendRequest) => prepareIr(getWindow, req));
   handle("tones:prepareSnapTone", (_e, req: SendRequest) => prepareSnapTone(getWindow, req));
-  handle("tones:prepareLocalIr", async (_e, req: LocalIrRequest) => {
-    const name = sanitizeSlotName(req.name);
-    if (!name) throw new HostError("invalid", "Give the IR a name (letters and digits, up to 10 characters)");
-    const buf = req.path ? await readFile(req.path) : req.bytes ? Buffer.from(req.bytes) : null;
-    if (!buf) throw new HostError("invalid", "No file to prepare");
-    try {
-      assertWav(buf);
-    } catch (e) {
-      throw new HostError("invalid", e instanceof Error ? e.message : String(e));
-    }
-    await mkdir(handoffDir(), { recursive: true });
-    const fileName = `${name}.wav`;
-    const path = join(handoffDir(), fileName);
-    await writeFile(path, buf);
-    return { path, fileName };
+  // An IR opened from the OS ("Open with", second instance) arrives as a path only; the renderer converts it.
+  handle("tones:readLocalIr", async (_e, path: unknown) => {
+    if (typeof path !== "string" || extname(path).toLowerCase() !== ".wav") throw new HostError("invalid", "Only .wav files can go to a User IR slot");
+    const size = (await stat(path).catch(() => null))?.size;
+    if (size === undefined) throw new HostError("not-found", `${basename(path)} isn't there anymore`);
+    if (size > MAX_LOCAL_IR) throw new HostError("invalid", `${basename(path)} is too large for an impulse response`);
+    return new Uint8Array(await readFile(path));
   });
-  handle("tones:setPending", (_e, toneId: number, pending: ToneRecord["gp5"]["pending"] | null) =>
-    updateRecord(toneId, (r) => ({ ...r, gp5: { ...r.gp5, pending: pending ?? undefined } })),
-  );
   handle("tones:link", (_e, toneId: number, link: { kind: "snaptone" | "ir"; slot: number; slotName: string } | null) =>
     updateRecord(toneId, (r) => {
-      const { snaptoneSlot: _s, irSlot: _i, slotName: _n, linkedAt: _l, pending: _p, ...rest } = r.gp5;
+      const { snaptoneSlot: _s, irSlot: _i, slotName: _n, linkedAt: _l, ...rest } = r.gp5;
       if (!link) return { ...r, gp5: rest };
       return {
         ...r,
@@ -333,28 +304,4 @@ export function registerTonesIpc(getWindow: () => BrowserWindow | null): void {
     }),
   );
   handle("tones:local", () => listRecords(tonesDir()));
-  handle("tones:handoff", async () => {
-    const dir = handoffDir();
-    await mkdir(dir, { recursive: true });
-    const names = (await readdir(dir)).filter((n) => /\.(nam|wav)$/i.test(n));
-    const files = await Promise.all(
-      names.map(async (name) => {
-        const s = await stat(join(dir, name));
-        return { name, path: join(dir, name), size: s.size, mtime: s.mtimeMs };
-      }),
-    );
-    return { dir, files: files.sort((a, b) => b.mtime - a.mtime) };
-  });
-  handle("tones:openSuite", () => openSuite(getWindow));
-  handle("tones:pickSuite", async () => {
-    const win = getWindow();
-    const opts: Electron.OpenDialogOptions = {
-      title: "Where is Valeton Suite?",
-      properties: ["openFile"],
-      filters: process.platform === "darwin" ? [{ name: "Applications", extensions: ["app"] }] : [{ name: "Programs", extensions: ["exe"] }],
-      defaultPath: process.platform === "darwin" ? "/Applications" : undefined,
-    };
-    const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
-    return res.canceled ? null : (res.filePaths[0] ?? null);
-  });
 }

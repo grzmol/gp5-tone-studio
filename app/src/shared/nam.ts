@@ -1,4 +1,4 @@
-// NAM file check for the GP-5 (SnapTone conversion and the Valeton Suite hand-off).
+// NAM file check for the GP-5 SnapTone conversion.
 // Valeton Suite 2.1.0 makes a GP-5 SnapTone from any model its NeuralAmpModelerCore loads (no size or
 // architecture gate in its Dart code; see .claude/skills/gp5-reverse-engineering/snaptone.md). Tone Studio
 // reproduces that conversion for the two families it renders like Suite does:
@@ -235,8 +235,7 @@ export function checkNam(model: unknown): NamCheck {
 
 /**
  * Parse a downloaded .nam and confirm Tone Studio can make a GP-5 SnapTone from it. A1 comes back in the 0.5.x
- * layout (reshaped from 0.7.x when needed); A2 comes back unchanged. Returns the JSON text for the converter
- * and the Valeton Suite hand-off.
+ * layout (reshaped from 0.7.x when needed); A2 comes back unchanged. Returns the JSON text for the converter.
  */
 export function prepareNam(text: string): { json: string; check: NamCheck } {
   let model: unknown;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronRight, Folder, FolderOpen, RefreshCw } from "lucide-react";
-import type { HandoffFolder, ToneRecord } from "@shared/host/tones";
+import { ChevronRight, RefreshCw } from "lucide-react";
+import type { ToneRecord } from "@shared/host/tones";
 import { isEmptySlotName } from "@shared/tone3000";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -16,14 +16,14 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { host, isElectron } from "@/host";
+import { host } from "@/host";
 import { cn } from "@/lib/utils";
 import { useDevice } from "@/state/device";
 import { useNav } from "@/state/nav";
 import type { SlotName } from "@/state/device-types";
 import { requestPresetSwitch } from "@/app/preset-switch";
 import { notifyError, showToast } from "@/app/notify";
-import { finishSuite, openLinkChoice, openSheet, readSlots, unlink, useTones } from "./store";
+import { irSlotLabel, openLinkChoice, openSheet, readSlots, unlink, useTones } from "./store";
 import { buildUsage, type PresetRef } from "./usage";
 import { ToneImage } from "./ToneImage";
 
@@ -45,7 +45,7 @@ function ago(at: number, now: number): string {
   return `Read at ${new Date(at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
 }
 
-/** "On your GP-5": SnapTone and User IR slot maps plus the Valeton Suite hand-off folder. */
+/** "On your GP-5": SnapTone and User IR slot maps. */
 export function SlotPanel() {
   const status = useDevice((s) => s.status);
   const error = useDevice((s) => s.error);
@@ -55,8 +55,6 @@ export function SlotPanel() {
   const preset = useDevice((s) => s.preset);
   const readAt = useTones((s) => s.slotsReadAt);
   const slotsError = useTones((s) => s.slotsError);
-  const suiteRunning = useTones((s) => s.suiteRunning);
-  const pausedMode = useTones((s) => s.pausedMode);
   const usage = useTones((s) => s.usage);
   const records = useTones((s) => s.records);
   const send = useTones((s) => s.send);
@@ -99,8 +97,7 @@ export function SlotPanel() {
   const sourceNote = usage ? `From ${usage.source}` : "Back up the pedal in Library to see which presets use each slot";
 
   let notice: string | null = null;
-  if (suiteRunning || pausedMode) notice = "Paused while Valeton Suite is open.";
-  else if (error?.code === "busy") notice = "Close Valeton Suite to reconnect.";
+  if (error?.code === "busy") notice = "Close Valeton Suite to reconnect.";
   else if (!connected && snapTones) notice = `GP-5 not connected. Slots from ${readAt ? new Date(readAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "the last read"}.`;
   else if (!connected) notice = "Connect the GP-5 to see its capture and IR slots.";
   else if (slotsError) notice = `Couldn't read the slots: ${slotsError}`;
@@ -153,8 +150,6 @@ export function SlotPanel() {
           <SlotGrid kind="ir" slots={userIRs} index={index.ir} links={links.ir} targets={targets.ir} note={sourceNote} />
         </section>
       )}
-
-      {isElectron && <HandoffRow />}
     </aside>
   );
 }
@@ -212,7 +207,7 @@ function SlotCell({
   readOnly?: boolean;
 }) {
   const empty = isEmptySlotName(slot.name);
-  const label = kind === "snaptone" ? `SnapTone ${slot.slot}` : `User IR ${slot.slot}`;
+  const label = kind === "snaptone" ? `SnapTone ${slot.slot}` : irSlotLabel(slot.slot);
   const stale = link && link.gp5.slotName && link.gp5.slotName !== slot.name;
   const records = useTones((s) => s.records);
   const linkable = Object.values(records).filter((r) => (kind === "snaptone" ? r.format === "nam" : r.format === "ir"));
@@ -220,7 +215,11 @@ function SlotCell({
   const onClick = () => {
     if (link) openSheet(link.tone_id);
     else if (empty)
-      showToast({ tone: "ok", title: `${label} is empty`, body: `Send a ${kind === "snaptone" ? "capture" : "IR"} from TONE3000 to fill this slot.` });
+      showToast({
+        tone: "ok",
+        title: `${label} is empty`,
+        body: kind === "snaptone" ? "Send a capture from TONE3000 to fill this slot." : "Send an IR from TONE3000, or drop a .wav file on Tones, to fill this slot.",
+      });
   };
   const openOnRig = async (p: PresetRef) => {
     useNav.getState().go("rig");
@@ -254,7 +253,7 @@ function SlotCell({
                 target && "shadow-[inset_0_0_0_1px_var(--lamp)]",
               )}
             >
-              <span className="min-w-4 flex-none text-[11px] font-semibold text-silkscreen-3">{slot.slot}</span>
+              <span className="min-w-4 flex-none text-[11px] font-semibold text-silkscreen-3">{kind === "ir" ? slot.slot + 1 : slot.slot}</span>
               <span className={cn("truncate", target ? "font-semibold text-lamp" : empty ? "font-medium text-silkscreen-4" : "font-semibold text-silkscreen")}>
                 {target && empty ? "Proposed" : empty ? "Empty" : slot.name}
               </span>
@@ -269,7 +268,7 @@ function SlotCell({
       <ContextMenuContent className="w-64">
         <ContextMenuGroup>
           {!readOnly && !empty && (
-            <ContextMenuItem disabled={linkable.length === 0} onSelect={() => openLinkChoice({ mode: "tone", kind, slot: slot.slot })}>
+            <ContextMenuItem disabled={linkable.length === 0} onSelect={() => openLinkChoice({ kind, slot: slot.slot })}>
               Link to a TONE3000 tone…
             </ContextMenuItem>
           )}
@@ -300,51 +299,5 @@ function SlotCell({
         </ContextMenuGroup>
       </ContextMenuContent>
     </ContextMenu>
-  );
-}
-
-/** Files prepared for Valeton Suite, and the pending hand-off's "find it on the pedal" step. */
-function HandoffRow() {
-  const records = useTones((s) => s.records);
-  const send = useTones((s) => s.send);
-  const [folder, setFolder] = useState<HandoffFolder | null>(null);
-  const pending = Object.values(records).filter((r) => r.gp5.pending);
-  const sendKey = Object.values(send)
-    .map((s) => s.phase)
-    .join();
-
-  useEffect(() => {
-    host.tones.handoff().then(setFolder, () => setFolder(null));
-  }, [sendKey, records]);
-
-  if (!folder) return null;
-  const files = folder.files;
-  const summary = files.length === 0 ? "No files waiting" : `${files.length} file${files.length === 1 ? "" : "s"} waiting: ${files.map((f) => f.name).join(", ")}`;
-  const show = () => (files[0] ? host.app.showItemInFolder(files[0].path) : host.app.openPath(folder.dir)).catch((e) => notifyError("Couldn't open the folder", e));
-
-  return (
-    <div className="mt-auto flex flex-col gap-2 rounded-lg bg-well py-2.5 pr-2.5 pl-3 text-[12px]">
-      <div className="flex items-center gap-2.5">
-        <Folder className="size-[18px] flex-none text-silkscreen-2" aria-hidden />
-        <div className="min-w-0 grow">
-          <div className="font-semibold text-silkscreen">Ready for Valeton Suite</div>
-          <div className="truncate text-silkscreen-3">{summary}</div>
-        </div>
-        <Button variant="ghost" size="sm" onClick={show}>
-          <FolderOpen data-icon="inline-start" />
-          Show folder
-        </Button>
-      </div>
-      {pending.length > 0 && (
-        <div className="flex items-center gap-2.5 border-t border-seam pt-2">
-          <span className="min-w-0 grow truncate text-silkscreen-2">
-            Waiting for {pending.map((r) => r.gp5.pending!.fileName).join(", ")} on the pedal
-          </span>
-          <Button variant="outline" size="sm" onClick={() => void finishSuite()}>
-            Find it on the pedal
-          </Button>
-        </div>
-      )}
-    </div>
   );
 }

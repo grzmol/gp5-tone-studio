@@ -14,12 +14,11 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { host, isElectron } from "@/host";
 import { useDevice } from "@/state/device";
 import { useNav } from "@/state/nav";
-import { useCommand, useFileHandler, useStatusHints, useStatusMessage, useUi, type OpenFile } from "@/state/ui";
+import { useCommand, useFileHandler, useStatusHints, useUi, type OpenFile } from "@/state/ui";
 import { modKey } from "@/app/keys";
 import { notifyError } from "@/app/notify";
 import {
   browse,
-  finishSuite,
   loadAccount,
   loadAllCounts,
   loadList,
@@ -28,6 +27,7 @@ import {
   onSendProgress,
   openSheet,
   readSlots,
+  signIn,
   signOut,
   TAB_ORDER,
   useTones,
@@ -63,8 +63,6 @@ export function TonesScreen() {
   const tab = useTones((s) => s.tab);
   const status = useDevice((s) => s.status);
   const hasSlots = useDevice((s) => s.snapTones !== null && s.userIRs !== null);
-  const suiteRunning = useTones((s) => s.suiteRunning);
-  const pausedMode = useTones((s) => s.pausedMode);
   const param = useNav((s) => s.param);
   const [localIr, setLocalIr] = useState<OpenFile | null>(null);
   const signedIn = account?.status === "signed-in";
@@ -73,11 +71,7 @@ export function TonesScreen() {
     void loadAccount();
     void loadRecords();
     void loadUsage();
-    return host.tones.onEvent((ev) => {
-      if (ev.type === "progress") onSendProgress(ev.toneId, ev.step, ev.received, ev.total);
-      else if (ev.running) useTones.setState({ suiteRunning: true });
-      else void finishSuite();
-    });
+    return host.tones.onEvent((ev) => onSendProgress(ev.toneId, ev.step, ev.received, ev.total));
   }, []);
 
   // Read the slot tables once per connection (the link step re-runs on every read).
@@ -98,9 +92,9 @@ export function TonesScreen() {
   }, [param]);
 
   useCommand("browse-tone3000", browseOrLinkOut);
-  useFileHandler("wav", (files) => setLocalIr(files[0] ?? null), isElectron);
+  // A .wav opened or dropped anywhere goes to a User IR slot (Song takes it while Song is showing).
+  useFileHandler("wav", (files) => setLocalIr(files[0] ?? null));
   useStatusHints(HINTS);
-  useStatusMessage(suiteRunning || pausedMode ? { led: "warn", text: "Paused while Valeton Suite is open" } : null);
   useShortcuts();
 
   return (
@@ -183,7 +177,7 @@ function Head() {
             </DropdownMenuContent>
           </DropdownMenu>
         ) : account?.status === "expired" ? (
-          <Button variant="ghost" size="sm" onClick={() => browse()}>
+          <Button variant="ghost" size="sm" onClick={() => void signIn()}>
             Sign in again
           </Button>
         ) : (
@@ -255,10 +249,10 @@ function ToneLists() {
 
 function SignedOut({ desktopOnly }: { desktopOnly?: boolean }) {
   const account = useTones((s) => s.account);
+  const go = useNav((s) => s.go);
   let text = "Sign in to TONE3000 to see your favorites, uploads and downloads here.";
   if (desktopOnly) text = "TONE3000 sign-in, lists and downloads need the desktop app. The slot map on the right works here too.";
-  else if (account && !account.configured)
-    text = "This build of Tone Studio has no TONE3000 app key, so it can't sign in. The slot map on the right still works.";
+  else if (account && !account.configured) text = "No TONE3000 app key is set, so Tone Studio can't sign in. Enter one in Settings. The slot map on the right still works.";
   else if (account?.status === "expired") text = "Your TONE3000 sign-in expired. Sign in again to see your tones.";
   return (
     <Empty className="flex-1 rounded-lg shadow-[inset_0_0_0_1px_var(--seam)]">
@@ -274,7 +268,11 @@ function SignedOut({ desktopOnly }: { desktopOnly?: boolean }) {
             Open TONE3000 in your browser
           </Button>
         ) : account?.configured ? (
-          <Button onClick={() => browse()}>{account.status === "expired" ? "Sign in again" : "Sign in to TONE3000"}</Button>
+          <Button onClick={() => void signIn()}>{account.status === "expired" ? "Sign in again" : "Sign in to TONE3000"}</Button>
+        ) : account ? (
+          <Button variant="outline" onClick={() => go("device", "settings")}>
+            Open Settings
+          </Button>
         ) : null}
       </EmptyContent>
     </Empty>

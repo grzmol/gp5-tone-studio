@@ -9,20 +9,17 @@ export const tonesApi: TonesApi = {
   setFlowBounds: (bounds) => invoke("tones:setFlowBounds", bounds),
   cancelFlow: () => invoke("tones:cancelFlow"),
   signOut: () => invoke("tones:signOut"),
+  setAppKey: (appKey) => invoke("tones:setAppKey", appKey),
   list: (kind, page, refresh) => invoke("tones:list", kind, page, refresh),
   tone: (id) => invoke("tones:tone", id),
   models: (toneId) => invoke("tones:models", toneId),
   image: (url) => invoke("tones:image", url),
   downloadModel: (toneId, modelId) => invoke("tones:downloadModel", toneId, modelId),
-  prepareForSuite: (req) => invoke("tones:prepareForSuite", req),
+  prepareIr: (req) => invoke("tones:prepareIr", req),
   prepareSnapTone: (req) => invoke("tones:prepareSnapTone", req),
-  prepareLocalIr: (req) => invoke("tones:prepareLocalIr", req),
-  setPending: (toneId, pending) => invoke("tones:setPending", toneId, pending),
+  readLocalIr: (path) => invoke("tones:readLocalIr", path),
   link: (toneId, link) => invoke("tones:link", toneId, link),
   local: () => invoke("tones:local"),
-  handoff: () => invoke("tones:handoff"),
-  openSuite: () => invoke("tones:openSuite"),
-  pickSuite: () => invoke("tones:pickSuite"),
   onEvent: (cb) => {
     const handler = (_e: IpcRendererEvent, event: TonesEvent) => cb(event);
     ipcRenderer.on("tones:event", handler);
