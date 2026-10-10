@@ -212,6 +212,8 @@ npm run dev        # desktop app
 npm run web        # in the browser at http://localhost:5790
 ```
 
+Installers for macOS, Windows and Linux are on the [Releases](https://github.com/grzmol/VLTN-Tone-Studio/releases) page.
+
 No pedal? Open `http://localhost:5790/?mock` to use a simulated GP-5 loaded with a full 100-slot backup.
 
 All commands and the code layout are in [`app/README.md`](app/README.md).

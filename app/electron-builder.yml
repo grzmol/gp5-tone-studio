@@ -1,8 +1,11 @@
 # Packaging for VLTN Tone Studio (design/electron.md › Packaging and updates).
 # Build: `npm run dist` (electron-vite build, then electron-builder for the current OS).
+# Releases: .github/workflows/release.yml builds every OS on a push to main and publishes v<version>.
 appId: app.vltntonestudio.desktop
 productName: VLTN Tone Studio
 copyright: Copyright © 2026 VLTN Tone Studio contributors
+# No spaces: GitHub turns them into dots in release asset names.
+artifactName: vltn-tone-studio-${version}-${arch}.${ext}
 
 directories:
   output: dist
@@ -30,8 +33,8 @@ linux:
     - AppImage
     - deb
   category: Audio
+  maintainer: grzmol <grzmol@users.noreply.github.com>
   synopsis: Editor and librarian for the Valeton GP-5
-  description: Shape GP-5 presets live, sort and back up its 100 slots, and bring NAM captures and IRs from TONE3000.
   # WebMIDI goes through ALSA sequencer (/dev/snd/seq); users outside the "audio" group are told how to fix
   # it by Device › Diagnostics.
   mimeTypes:
@@ -50,7 +53,10 @@ nsis:
 
 mac:
   target:
-    - dmg
+    - target: dmg
+      arch:
+        - arm64
+        - x64
   category: public.app-category.music
   hardenedRuntime: true
   # Notarization runs when APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID are set (CI release builds).

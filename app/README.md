@@ -17,6 +17,12 @@ Electron is pinned to 43.x because Chromium 152 (Electron 44) breaks WebMIDI Sys
 | `npm run build:wasm` | Rebuilds `src/renderer/src/snaptone/a1kernel.wasm` from `a1kernel.c` (needs clang with the wasm32 target; the `.wasm` is committed) |
 | `npm run build` / `npm run dist` | `electron-vite` build; `dist` also packages with `electron-builder.yml` |
 
+## Branches and releases
+- Work happens on `develop`. Merging `develop` into `main` publishes a release: `.github/workflows/release.yml` runs the typecheck and both test suites, builds the `.dmg` (arm64 and x64), the NSIS installer, the AppImage and the `.deb`, and creates GitHub Release `v<version>` with them.
+- `<version>` is `version` in `package.json`. Bump it on `develop` before merging; the workflow fails when that release already exists.
+- The TONE3000 sign-in in release builds needs the repository secret `T3K_CLIENT_ID`.
+- Packages are unsigned: macOS Gatekeeper and Windows SmartScreen warn on first launch.
+
 ## Launch parameters (web build, demos, E2E)
 - `?mock` connects the simulated GP-5, loaded with the bundled 100-slot backup (`src/renderer/src/gp5/fixtures/backup/`).
 - `?screen=rig|library|tones|device|capture` opens that screen. Add `&param=` to pass a value: `device` + `settings` opens Settings, and `capture` takes a capture id.

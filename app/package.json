@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Desktop editor and librarian for the Valeton GP-5",
+  "homepage": "https://github.com/grzmol/VLTN-Tone-Studio",
   "main": "./out/main/index.js",
   "type": "module",
   "scripts": {
