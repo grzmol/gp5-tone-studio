@@ -1,7 +1,7 @@
 {
   "name": "vltn-tone-studio",
   "productName": "VLTN Tone Studio",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Desktop editor and librarian for the Valeton GP-5",
   "homepage": "https://github.com/grzmol/VLTN-Tone-Studio",
@@ -43,6 +43,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "electron-updater": "^6.8.10",
     "lucide-react": "^1.52.0",
     "neural-amp-modeler-wasm": "^2.0.1",
     "onnxruntime-web": "1.30.0",

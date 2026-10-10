@@ -24,6 +24,8 @@ interface ToastSpec {
   title: string;
   body?: string;
   action?: ToastAction;
+  /** Keep an "ok" toast until dismissed (it asks for a decision) */
+  sticky?: boolean;
 }
 
 function ToastCard({ id, spec }: { id: string | number; spec: ToastSpec }) {
@@ -71,7 +73,7 @@ function ToastCard({ id, spec }: { id: string | number; spec: ToastSpec }) {
 }
 
 export function showToast(spec: ToastSpec): string | number {
-  return toast.custom((id) => <ToastCard id={id} spec={spec} />, { duration: spec.tone === "ok" ? 6000 : Infinity });
+  return toast.custom((id) => <ToastCard id={id} spec={spec} />, { duration: spec.tone === "ok" && !spec.sticky ? 6000 : Infinity });
 }
 
 /** Device/toolkit error → one plain sentence (overlays.md G mapping). */

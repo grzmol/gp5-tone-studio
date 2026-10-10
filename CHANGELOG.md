@@ -2,6 +2,20 @@
 
 All notable changes to VLTN Tone Studio. Versions match `app/package.json` and the GitHub Releases. The release workflow copies the section of the version it publishes into the release notes.
 
+## [0.4.0] - 2026-10-10
+
+### Added
+- **In-app updates.** When Tone Studio starts and finds a newer release on GitHub, it asks whether to download and install it. On Windows and with the AppImage, *Download and install* fetches the update, checks it against the SHA-512 published with the release, and restarts into the new version. The progress shows in the dialog, and *Hide* lets you keep working while it downloads. On macOS and with the `.deb`, the dialog offers the release page instead.
+- **Safe restarts.** The app never restarts for an update while it is writing to or backing up the GP-5. If the preset has unsaved changes, it asks first. *Later* or *Install when I quit* installs a downloaded update the next time you close the app.
+- **Update controls.** *Help › Check for updates…*, the command palette and the About dialog check right away. *Settings › About* shows the version and the update status. It also has *Check for updates automatically* (on by default: at launch and every six hours). Nothing is downloaded until you agree.
+
+### Changed
+- Releases also publish `latest.yml`, `latest-linux.yml` and the installer blockmaps, which the app updates from. Each release is created as a draft and only published once every file is uploaded. The workflow stops if the update files are missing or name another version.
+
+### Known limitations
+- 0.4.0 is the first version that can update itself. To get it, download it from the Releases page; from 0.4.0 on, the app offers new versions by itself.
+- macOS builds aren't signed yet, so macOS can't install updates in place. The app opens the release page instead.
+
 ## [0.3.0] - 2026-10-10
 
 ### Added
@@ -37,6 +51,7 @@ All notable changes to VLTN Tone Studio. Versions match `app/package.json` and t
 - TONE3000 sign-in, tone lists and downloads.
 - Release builds for macOS (`.dmg`), Windows (NSIS) and Linux (AppImage, `.deb`).
 
+[0.4.0]: https://github.com/grzmol/VLTN-Tone-Studio/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/grzmol/VLTN-Tone-Studio/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/grzmol/VLTN-Tone-Studio/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/grzmol/VLTN-Tone-Studio/releases/tag/v0.1.0

@@ -7,6 +7,7 @@ import { captureApi } from "./capture";
 import { deviceApi } from "./device";
 import { snapToneApi } from "./snaptone";
 import { songApi } from "./song";
+import { updateApi } from "./update";
 
 const host: HostApi = {
   kind: "electron",
@@ -18,6 +19,7 @@ const host: HostApi = {
   device: deviceApi,
   snaptone: snapToneApi,
   song: songApi,
+  update: updateApi,
 };
 
 contextBridge.exposeInMainWorld("gp5host", host);

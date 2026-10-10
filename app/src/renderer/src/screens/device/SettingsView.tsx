@@ -10,16 +10,16 @@ import { host, isElectron } from "@/host";
 import { useNav } from "@/state/nav";
 import { loadAccount, setAppKey, signOut, useTones } from "@/screens/tones/store";
 import { useAppSettings } from "./settings-store";
+import { useDevice } from "@/state/device";
+import { checkForUpdates, downloadUpdate, installUpdate, openReleasePage, useUpdate } from "@/app/updates";
 
 /** Settings (`?screen=device&param=settings`): how Tone Studio behaves on this computer. */
 export function SettingsView() {
   const { settings, loaded, load, patch } = useAppSettings();
   const go = useNav((s) => s.go);
-  const [version, setVersion] = useState<string | null>(null);
 
   useEffect(() => {
     void load().catch((e) => notifyError("Couldn't read the settings", e));
-    void host.app.version().then(setVersion, () => {});
     void loadAccount();
   }, [load]);
 
@@ -62,10 +62,21 @@ export function SettingsView() {
         </Section>
 
         <Section title="About">
-          <Row
-            label={isElectron ? `Tone Studio ${version ?? ""}`.trim() : "Tone Studio in the browser"}
-            description={isElectron ? "Desktop app for the Valeton GP-5." : "Backups stay in this browser. Valeton Suite and folders on disk need the desktop app."}
-          />
+          {isElectron ? (
+            <>
+              <UpdateRow />
+              <Row label="Check for updates automatically" description="Ask GitHub for a new release when the app starts and every six hours, and offer to install it. Nothing is downloaded until you choose to.">
+                <Switch
+                  checked={settings.checkForUpdates}
+                  disabled={!loaded}
+                  onCheckedChange={(v) => save({ checkForUpdates: v })}
+                  aria-label="Check for updates automatically"
+                />
+              </Row>
+            </>
+          ) : (
+            <Row label="Tone Studio in the browser" description="Backups stay in this browser. Valeton Suite and folders on disk need the desktop app." />
+          )}
         </Section>
       </div>
     </div>
@@ -90,6 +101,58 @@ function Row({ label, description, children }: { label: ReactNode; description: 
       </div>
       {children && <div className="flex min-w-0 items-center justify-end gap-2">{children}</div>}
     </div>
+  );
+}
+
+/** Version, the update state from main and the one action that fits it. */
+function UpdateRow() {
+  const snap = useUpdate((s) => s.snapshot);
+  // Same jobs main refuses to interrupt (they report taskbar progress): every long job except reading names.
+  const busyJob = useDevice((s) => !!s.busy && s.busy.kind !== "sync");
+  const state = snap?.state ?? { status: "idle" as const };
+  const installs = snap?.mode === "install";
+  const description = (() => {
+    switch (state.status) {
+      case "idle":
+        return "Not checked for updates yet.";
+      case "checking":
+        return "Checking GitHub for a new release…";
+      case "current":
+        return `Up to date. Checked ${new Date(state.checkedAt).toLocaleString()}.`;
+      case "available":
+        return installs
+          ? `Version ${state.version} is available. Download it here; it installs when you restart.`
+          : `Version ${state.version} is available. This build can't install updates by itself: download it from the release page.`;
+      case "downloading":
+        return `Downloading version ${state.version}: ${state.percent}%.`;
+      case "ready":
+        return busyJob
+          ? `Version ${state.version} is downloaded and checked. Restart when the pedal finishes its current job, or it installs when you quit.`
+          : `Version ${state.version} is downloaded and checked. It installs when you restart or quit Tone Studio.`;
+      case "error":
+        return state.message;
+    }
+  })();
+  return (
+    <Row label={`Tone Studio ${snap?.current ?? ""}`.trim()} description={<span aria-live="polite">{description}</span>}>
+      {(state.status === "available" || state.status === "ready") && (
+        <Button variant="ghost" onClick={() => void openReleasePage(state.version)}>
+          What's new
+        </Button>
+      )}
+      {state.status === "available" && installs && <Button onClick={() => void downloadUpdate()}>Download</Button>}
+      {state.status === "available" && !installs && <Button onClick={() => void openReleasePage(state.version)}>Release page</Button>}
+      {state.status === "ready" && (
+        <Button disabled={busyJob} onClick={() => void installUpdate()}>
+          Restart now
+        </Button>
+      )}
+      {state.status !== "available" && state.status !== "ready" && (
+        <Button variant="outline" disabled={state.status === "checking" || state.status === "downloading"} onClick={() => void checkForUpdates()}>
+          Check now
+        </Button>
+      )}
+    </Row>
   );
 }
 
