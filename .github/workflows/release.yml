@@ -101,6 +101,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/release-notes.md
+          sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@v5
         with:
           path: packages
@@ -114,4 +118,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "VLTN Tone Studio $TAG" \
+            --notes-file .github/release-notes.md \
             --generate-notes
