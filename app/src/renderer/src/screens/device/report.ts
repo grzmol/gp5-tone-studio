@@ -25,7 +25,7 @@ const MARK = { ok: "OK  ", warn: "WARN", fault: "FAIL", idle: "--  ", pending: "
 export function buildReport(r: ReportInput): string {
   const h = r.host;
   const lines = [
-    "GP-5 Tone Studio diagnostic report",
+    "VLTN Tone Studio diagnostic report",
     `Created: ${new Date(r.now ?? Date.now()).toISOString()}`,
     "",
     `App: ${r.appVersion}${h?.versions.electron ? ` (Electron ${h.versions.electron}, Chromium ${h.versions.chrome}, Node ${h.versions.node})` : h?.versions.chrome ? ` (browser, Chromium ${h.versions.chrome})` : ""}`,

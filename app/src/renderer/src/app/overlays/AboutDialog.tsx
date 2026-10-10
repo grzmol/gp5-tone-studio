@@ -7,7 +7,7 @@ import { useUi } from "@/state/ui";
 
 const PLATFORM: Record<string, string> = { darwin: "macOS", win32: "Windows", linux: "Linux" };
 
-/** Help › About GP-5 Tone Studio. One of the rare places for the brand violet (DESIGN.md › Colors). */
+/** Help › About VLTN Tone Studio. One of the rare places for the brand violet (DESIGN.md › Colors). */
 export function AboutDialog() {
   const open = useUi((s) => s.aboutOpen);
   const setOpen = useUi((s) => s.setAboutOpen);
@@ -25,7 +25,7 @@ export function AboutDialog() {
             <Cable className="size-6" strokeWidth={2.25} />
           </span>
           <div className="flex flex-col gap-0.5">
-            <DialogTitle className="text-lg font-semibold tracking-[-0.012em]">GP-5 Tone Studio</DialogTitle>
+            <DialogTitle className="text-lg font-semibold tracking-[-0.012em]">VLTN Tone Studio</DialogTitle>
             <span className="text-xs text-silkscreen-3 tabular-nums">
               {version ? (version === "web" ? where : `Version ${version} · ${where}`) : where}
             </span>

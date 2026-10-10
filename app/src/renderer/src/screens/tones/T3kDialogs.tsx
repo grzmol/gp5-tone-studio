@@ -24,7 +24,7 @@ export function SplashDialog() {
           <DialogTitle className="flex items-center gap-3 text-[15px]">
             <span className="flex items-center gap-2 font-semibold">
               <Cable className="size-4" aria-hidden />
-              GP-5 Tone Studio
+              VLTN Tone Studio
             </span>
             <span className="text-silkscreen-3" aria-label="and">
               ×
@@ -32,7 +32,7 @@ export function SplashDialog() {
             <span className="text-[12px] font-extrabold tracking-[0.02em] text-silkscreen">TONE3000</span>
           </DialogTitle>
           <DialogDescription className="text-[13px] leading-[1.5] text-pretty text-silkscreen-2">
-            GP-5 Tone Studio has partnered with TONE3000 to give you access to a massive library of Neural Amp Modeler (NAM) captures and IRs of real analog gear, created by a
+            VLTN Tone Studio has partnered with TONE3000 to give you access to a massive library of Neural Amp Modeler (NAM) captures and IRs of real analog gear, created by a
             global community of musicians.
           </DialogDescription>
         </DialogHeader>

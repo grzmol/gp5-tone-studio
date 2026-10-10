@@ -8,9 +8,9 @@ export function buildMenu(getWindow: () => BrowserWindow | null): void {
     ...(isMac
       ? [
           {
-            label: "GP-5 Tone Studio",
+            label: "VLTN Tone Studio",
             submenu: [
-              { label: "About GP-5 Tone Studio", click: send("about") },
+              { label: "About VLTN Tone Studio", click: send("about") },
               { type: "separator" as const },
               { label: "Settings…", accelerator: "Cmd+,", click: send("settings") },
               { type: "separator" as const },
@@ -77,7 +77,7 @@ export function buildMenu(getWindow: () => BrowserWindow | null): void {
       label: "Help",
       submenu: [
         { label: "Diagnostics report", click: send("diagnostics-report") },
-        { label: "About GP-5 Tone Studio", click: send("about") },
+        { label: "About VLTN Tone Studio", click: send("about") },
       ],
     },
   ];

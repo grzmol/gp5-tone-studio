@@ -1,8 +1,8 @@
-# Packaging for GP-5 Tone Studio (design/electron.md › Packaging and updates).
+# Packaging for VLTN Tone Studio (design/electron.md › Packaging and updates).
 # Build: `npm run dist` (electron-vite build, then electron-builder for the current OS).
-appId: app.gp5tonestudio.desktop
-productName: GP-5 Tone Studio
-copyright: Copyright © 2026 GP-5 Tone Studio contributors
+appId: app.vltntonestudio.desktop
+productName: VLTN Tone Studio
+copyright: Copyright © 2026 VLTN Tone Studio contributors
 
 directories:
   output: dist
@@ -15,7 +15,7 @@ files:
   - "!**/*.map"
 asarUnpack: []
 
-# Double-clicking a preset (or "Open with GP-5 Tone Studio") starts the app with the path; the
+# Double-clicking a preset (or "Open with VLTN Tone Studio") starts the app with the path; the
 # single-instance handler forwards it to the running window, which opens it in the Library.
 fileAssociations:
   - ext: prst
@@ -58,4 +58,4 @@ mac:
     # The capture editor auditions NAM captures through the audio interface input (audio only).
     NSMicrophoneUsageDescription: Tone Studio plays your guitar through NAM captures in the capture editor.
 dmg:
-  title: GP-5 Tone Studio
+  title: VLTN Tone Studio

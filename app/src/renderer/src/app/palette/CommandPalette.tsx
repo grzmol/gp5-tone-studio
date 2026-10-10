@@ -207,7 +207,7 @@ function useGroups(close: () => void): Group[] {
       actionEntry({ id: "diagnostics", label: "Diagnostics report", icon: Stethoscope, words: ["help", "driver", "troubleshooting"], run: cmd("diagnostics-report") }),
       actionEntry({
         id: "about",
-        label: "About GP-5 Tone Studio",
+        label: "About VLTN Tone Studio",
         icon: Info,
         words: ["version"],
         run: () => {

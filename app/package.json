@@ -1,6 +1,6 @@
 {
-  "name": "gp5-tone-studio",
-  "productName": "GP-5 Tone Studio",
+  "name": "vltn-tone-studio",
+  "productName": "VLTN Tone Studio",
   "version": "0.1.0",
   "private": true,
   "description": "Desktop editor and librarian for the Valeton GP-5",

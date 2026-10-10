@@ -146,7 +146,7 @@ describe("withMetadata", () => {
     const original = parseNam(tinyA2);
     const edits = { ...editableMetadata(original), name: "  Plexi lead ", gear_make: "", output_level_dbu: 4.5, input_level_dbu: null };
     const out = withMetadata(original, edits);
-    expect(out.metadata).toMatchObject({ name: "Plexi lead", modeled_by: "GP-5 Tone Studio tests", output_level_dbu: 4.5, loudness: -26.5, date: original.metadata?.date });
+    expect(out.metadata).toMatchObject({ name: "Plexi lead", modeled_by: "VLTN Tone Studio tests", output_level_dbu: 4.5, loudness: -26.5, date: original.metadata?.date });
     expect(out.metadata).not.toHaveProperty("gear_make");
     expect(out.metadata).not.toHaveProperty("input_level_dbu");
     expect(editableMetadata(out)).toEqual({ ...edits, name: "Plexi lead" });
