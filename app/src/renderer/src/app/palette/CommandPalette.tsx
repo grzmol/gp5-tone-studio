@@ -14,6 +14,7 @@ import {
   Info,
   LibraryBig,
   Pencil,
+  RefreshCw,
   RotateCcw,
   Save,
   Search,
@@ -31,6 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Kbd } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
+import { isElectron } from "@/host";
 import { useDevice } from "@/state/device";
 import { BLOCK_CODES, type ModelInfo } from "@/state/device-types";
 import { runCommand, useUi, type AppCommand } from "@/state/ui";
@@ -226,6 +228,20 @@ function useGroups(close: () => void): Group[] {
           runMenuCommand("about");
         },
       }),
+      ...(isElectron
+        ? [
+            actionEntry({
+              id: "check-updates",
+              label: "Check for updates",
+              icon: RefreshCw,
+              words: ["update", "upgrade", "new version", "release"],
+              run: () => {
+                close();
+                runMenuCommand("check-updates");
+              },
+            }),
+          ]
+        : []),
     ];
 
     const screens: Entry[] = (

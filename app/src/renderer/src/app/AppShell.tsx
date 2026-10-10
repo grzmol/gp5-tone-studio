@@ -7,8 +7,10 @@ import { Rail } from "./Rail";
 import { StatusBar } from "./StatusBar";
 import { useAppCommands } from "./commands";
 import { useDeviceWatch } from "./device-watch";
+import { useUpdateWatch } from "./updates";
 import { CommandPalette } from "./palette/CommandPalette";
 import { AboutDialog } from "./overlays/AboutDialog";
+import { UpdateDialog } from "./overlays/UpdateDialog";
 import { UnsavedSwitchDialog } from "./overlays/UnsavedSwitchDialog";
 import { FileDropOverlay } from "./overlays/FileDropOverlay";
 import { RigScreen } from "@/screens/rig/RigScreen";
@@ -33,6 +35,7 @@ export function AppShell() {
   useLaunchParams();
   useAppCommands();
   useDeviceWatch();
+  useUpdateWatch();
   const Active = SCREENS[screen];
   return (
     <div className="grid h-full grid-cols-[84px_minmax(0,1fr)] grid-rows-[52px_minmax(0,1fr)]">
@@ -47,6 +50,7 @@ export function AppShell() {
       <CommandPalette />
       <UnsavedSwitchDialog />
       <AboutDialog />
+      <UpdateDialog />
       <FileDropOverlay />
     </div>
   );

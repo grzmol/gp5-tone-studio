@@ -25,6 +25,16 @@ extraResources:
     filter:
       - nam_input_wav.wav
 
+# Update feed (src/main/ipc/update.ts). electron-builder writes app-update.yml into the app and latest.yml /
+# latest-linux.yml (version, file, SHA-512) next to the installers; CI publishes them with the release.
+# No publisherName: builds are unsigned, so electron-updater checks the SHA-512 only. Set it once Windows builds
+# are signed and the updater also verifies the Authenticode publisher.
+publish:
+  provider: github
+  owner: grzmol
+  repo: VLTN-Tone-Studio
+  releaseType: release
+
 # Double-clicking a preset (or "Open with VLTN Tone Studio") starts the app with the path; the
 # single-instance handler forwards it to the running window, which opens it in the Library.
 fileAssociations:
