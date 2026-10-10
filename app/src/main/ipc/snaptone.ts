@@ -7,7 +7,8 @@ import { loadSettings } from "./app";
 import { handle } from "./handle";
 
 // Valeton's test signal for the SnapTone conversion (see src/shared/host/snaptone.ts). A checked copy is kept in
-// userData/snaptone; until then it is looked up in the Valeton Suite install.
+// userData/snaptone; until then it comes from the build (local builds with the git-ignored fixture) or the
+// Valeton Suite install.
 const SIGNAL_NAME = "nam_input_wav.wav";
 const storedPath = () => join(app.getPath("userData"), "snaptone", SIGNAL_NAME);
 const MAC_SUITE = "/Applications/Valeton Suite.app";
@@ -31,16 +32,18 @@ async function keep(source: string, bytes: Uint8Array): Promise<Uint8Array> {
   return bytes;
 }
 
-/** The kept copy, else the file from the Suite install (then kept), else null. */
+/** The kept copy, else the build's copy or the file from the Suite install (then kept), else null. */
 async function findSignal(): Promise<Uint8Array | null> {
   const stored = await readFile(storedPath()).catch(() => null);
   if (stored) return new Uint8Array(stored);
   const suitePath = (await loadSettings()).valetonSuitePath;
   const suites = [suitePath, process.platform === "darwin" ? MAC_SUITE : null].filter((p): p is string => Boolean(p));
-  for (const suite of suites) {
-    const candidate = inSuite(suite);
-    const bytes = candidate ? await readFile(candidate).catch(() => null) : null;
-    if (!candidate || !bytes) continue;
+  // This build's copy: electron-builder `extraResources` when packaged, the git-ignored repo fixture in dev.
+  const bundled = app.isPackaged ? join(process.resourcesPath, "snaptone", SIGNAL_NAME) : join(app.getAppPath(), "src/renderer/src/snaptone/fixtures", SIGNAL_NAME);
+  const candidates = [bundled, ...suites.map(inSuite)].filter((p): p is string => Boolean(p));
+  for (const candidate of candidates) {
+    const bytes = await readFile(candidate).catch(() => null);
+    if (!bytes) continue;
     try {
       return await keep(candidate, new Uint8Array(bytes));
     } catch {
