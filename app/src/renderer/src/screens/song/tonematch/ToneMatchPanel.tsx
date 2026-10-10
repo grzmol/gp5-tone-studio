@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { AudioLines, Guitar, Info, RotateCcw } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -63,11 +62,6 @@ export function ToneMatchPanel() {
   const status = useToneMatch((s) => s.status);
   const analysis = useToneMatch((s) => s.analysis);
   const proposal = useToneMatch((s) => s.proposal);
-
-  // Analyse as soon as there is a guitar stem to look at.
-  useEffect(() => {
-    if (stems && useToneMatch.getState().status.kind === "idle") void useToneMatch.getState().analyse();
-  }, [stems]);
 
   if (!stems) return <NeedStems />;
 

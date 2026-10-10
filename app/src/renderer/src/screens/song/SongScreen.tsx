@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { FileUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,8 +8,7 @@ import { AUDIO_ACCEPT } from "@/song/decode";
 import { useSong } from "@/song/store";
 import { StemsPanel } from "./stems/StemsPanel";
 import { ToneMatchPanel } from "./tonematch/ToneMatchPanel";
-
-type SongTab = "stems" | "tone";
+import { useSongTab, type SongTab } from "./tab";
 
 /** Decode `file` and split it right away (the reason anyone drops a song here). */
 export async function openSong(file: File): Promise<void> {
@@ -29,7 +28,7 @@ function openSongFiles(files: OpenFile[]) {
 
 /** Song (Stem Splitter + Tone Match): split a song into stems on this computer, then match its guitar tone. */
 export function SongScreen() {
-  const [tab, setTab] = useState<SongTab>("stems");
+  const [tab, setTab] = useSongTab();
   const source = useSong((s) => s.source);
   const fileInput = useRef<HTMLInputElement>(null);
   useFileHandler("audio", openSongFiles);
