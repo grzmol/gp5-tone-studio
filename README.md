@@ -2,14 +2,14 @@
 
 <br>
 
-# GP-5 Tone Studio
+# VLTN Tone Studio
 
 A desktop editor and librarian for the Valeton GP-5.<br>
 Shape tones live, sort and back up all 100 slots, and bring in NAM captures from TONE3000.
 
 <br>
 
-<img src="assets/rig.png" alt="GP-5 Tone Studio: the Rig screen" width="100%">
+<img src="assets/rig.png" alt="VLTN Tone Studio: the Rig screen" width="100%">
 
 <br>
 <br>
@@ -162,6 +162,26 @@ The capture editor plays your guitar through a capture, using the input of your 
 
 <br>
 
+## Devices.
+
+</div>
+
+<br>
+
+| Device | Support |
+|---|---|
+| **Valeton GP-5** | Live editing, library, backups and restore, SnapTones over USB |
+| **Valeton GP-50** | `.prst` files: import, inspect and convert to the GP-5 |
+| **Other Valeton pedals** | Planned |
+
+<br>
+
+---
+
+<div align="center">
+
+<br>
+
 ## Under the hood.
 
 </div>
@@ -200,7 +220,7 @@ All commands and the code layout are in [`app/README.md`](app/README.md).
 
 <div align="center">
 
-<sub>GP-5 Tone Studio is an independent project. It is not affiliated with or endorsed by Valeton.</sub>
+<sub>VLTN Tone Studio is an independent project. It is not affiliated with or endorsed by Valeton.</sub>
 
 <br>
 <br>

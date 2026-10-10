@@ -1,4 +1,4 @@
-# GP-5 Tone Studio (app)
+# VLTN Tone Studio (app)
 
 A desktop editor and librarian for the Valeton GP-5, built with Electron 43 (Chromium 150), React 19, TypeScript, Tailwind v4 and shadcn/ui (radix).
 
